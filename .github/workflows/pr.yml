@@ -1,0 +1,35 @@
+name: PR checks
+on: pull_request
+env:
+  ACTIONS_RUNNER_DEBUG: true
+  SECRET_KEY: test
+  ENV: ci
+  FLASK_DIRECTORY: /api/
+  FLASK_DOMAIN: http://localhost
+  FRONTEND_DOMAIN: http://localhost
+  MONGO_AUTH_USERNAME: root
+  MONGO_AUTH_PASSWORD: rootPassXXX
+  MONGO_APP_DATABASE: binbot
+  MONGO_AUTH_DATABASE: admin
+  MONGO_HOSTNAME: binbot_db
+  MONGO_PORT: 27018
+
+push_research_to_registry:
+    name: Binbot research docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Build image
+        run: |
+          cd research
+          docker build -t binbot_research .
+      - name: Tag image
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        run: |
+          docker tag binbot_research carloswufei/binbot_research:latest
+      - name: Push to Docker Hub
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        run: |
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+          docker push carloswufei/binbot_research:latest
