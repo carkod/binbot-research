@@ -1,0 +1,9 @@
+version: "3.7"
+services:
+  research:
+    build: .
+    image: binbot_research
+    restart: on-failure
+    container_name: binbot_research
+    env_file:
+      - .env

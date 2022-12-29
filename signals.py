@@ -144,12 +144,12 @@ class SetupSignals(BinbotApi):
         handle_binance_errors(res)
         return
 
-    def reached_max_active_autobots(self, db_collection_name):
+    def reached_max_active_autobots(self, db_collection_name: str) -> bool:
         """
         Check max `max_active_autotrade_bots` in controller settings
 
         Args:
-        - db_collection_name [string]: Database collection name ["paper_trading", "bots"]
+        - db_collection_name: Database collection name ["paper_trading", "bots"]
 
         If total active bots > settings.max_active_autotrade_bots
         do not open more bots. There are two reasons for this:
@@ -332,10 +332,10 @@ class ResearchSignals(SetupSignals):
             # Average amplitude
             msg = None
             list_prices = numpy.array(data["trace"][0]["close"])
-            sd = round_numbers((numpy.std(list_prices.astype(numpy.float))), 2)
+            sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
 
             # historical lowest for short_buy_price
-            lowest_price = numpy.min(numpy.array(data["trace"][0]["close"]).astype(numpy.float))
+            lowest_price = numpy.min(numpy.array(data["trace"][0]["close"]).astype(numpy.single))
             
             ma_candlestick_jump(
                 self,

@@ -7,6 +7,8 @@ from apis import BinbotApi
 from utils import InvalidSymbol, handle_binance_errors, round_numbers, supress_notation
 from datetime import datetime
 
+class AutotradeError(Exception):
+    pass
 
 class Autotrade(BinbotApi):
     def __init__(
@@ -272,6 +274,9 @@ class Autotrade(BinbotApi):
 
         # Activate bot
         botId = create_bot["botId"]
+        if "error" in create_bot and create_bot["error"] == 0:
+            print(create_bot["message"])
+            return
         print(f"Trying to activate {self.db_collection_name}...")
         res = requests.get(url=f"{activate_url}/{botId}")
         bot = handle_binance_errors(res)
@@ -372,7 +377,7 @@ def process_autotrade_restrictions(self, symbol, ws, algorithm, test_only=False,
     balance_check = float(next((item["free"] for item in balances["data"]["balances"] if item["asset"] == self.settings["balance_to_use"]), 0))
 
     if balance_check < float(self.settings['base_order_size']):
-        print("Not enough funds to autotrade.")
+        print(f"Not enough funds to autotrade [bots].")
         return
 
     if (
