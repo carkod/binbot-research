@@ -1,9 +1,9 @@
-import os
-import threading
-import time
 import atexit
 import logging
+import os
 import sys
+import threading
+import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -38,14 +38,10 @@ if os.getenv("ENV") != "ci":
 
 if __name__ == "__main__":
     rs = ResearchSignals()
-    rs_thread = threading.Thread(
-        name="rs_thread", target=rs.start_stream
-    )
+    rs_thread = threading.Thread(name="rs_thread", target=rs.start_stream)
     rs_thread.start()
     qfl = QFL_signals()
-    qfl_thread = threading.Thread(
-        name="qfl_thread", target=qfl.start_stream
-    )
+    qfl_thread = threading.Thread(name="qfl_thread", target=qfl.start_stream)
     qfl_thread.start()
     global stop_threads
     stop_threads = False

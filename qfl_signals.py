@@ -68,8 +68,8 @@ class QFL_signals(SetupSignals):
                 return
 
         list_prices = numpy.array(data["trace"][0]["close"])
-        sd = round_numbers((numpy.std(list_prices.astype(numpy.float))), 2)
-        lowest_price = numpy.min(numpy.array(data["trace"][0]["close"]).astype(numpy.float))
+        sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
+        lowest_price = numpy.min(numpy.array(data["trace"][0]["close"]).astype(numpy.single))
         return sd, lowest_price
 
     def on_message(self, ws, payload):

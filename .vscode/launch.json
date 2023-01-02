@@ -1,0 +1,13 @@
+{
+    "version": "0.0.2",
+    "configurations": [
+      {
+        "name": "Python: Research",
+        "type": "python",
+        "request": "launch",
+        "program": "__init__.py",
+        "console": "internalConsole"
+      }
+    ]
+  }
+  

@@ -6,6 +6,7 @@
 /.env
 .vscode/settings.json
 venv/
+binbot-research-env
 
 ##
 #

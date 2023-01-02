@@ -14,7 +14,9 @@ env:
   MONGO_HOSTNAME: binbot_db
   MONGO_PORT: 27018
 
-push_research_to_registry:
+
+jobs:
+  push_research_to_registry:
     name: Binbot research docker image
     runs-on: ubuntu-latest
     steps:
@@ -22,14 +24,14 @@ push_research_to_registry:
         uses: actions/checkout@v2
       - name: Build image
         run: |
-          cd research
           docker build -t binbot_research .
       - name: Tag image
         if: ${{ github.actor != 'dependabot[bot]' }}
         run: |
+          docker commit binbot_research carloswufei/binbot_research &
           docker tag binbot_research carloswufei/binbot_research:latest
       - name: Push to Docker Hub
         if: ${{ github.actor != 'dependabot[bot]' }}
         run: |
-          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
           docker push carloswufei/binbot_research:latest
