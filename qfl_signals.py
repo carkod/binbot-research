@@ -7,7 +7,6 @@ import logging
 import numpy
 from signals import SetupSignals
 from websocket import WebSocketApp
-from decimal import Decimal
 from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
@@ -65,7 +64,7 @@ class QFL_signals(SetupSignals):
 
         data = self._get_candlestick(symbol, "15m")
         if "error" in data and data["error"] == 1:
-                return
+                raise Exception(f"No stats for {symbol}")
 
         list_prices = numpy.array(data["trace"][0]["close"])
         sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
@@ -81,6 +80,7 @@ class QFL_signals(SetupSignals):
             )
             asset, quote = pair.split("-")
             symbol = pair.replace("-","")
+            self.symbol = symbol
             if not is_leveraged_token and asset not in self.last_processed_asset and symbol not in self.blacklist:
 
                 hodloo_url = f"{self.hodloo_chart_url + exchange_str}:{pair}"
@@ -97,7 +97,10 @@ class QFL_signals(SetupSignals):
 
                 if response["type"] == "base-break":
                     message = f"\nAlert Price: {alert_price}\n- Base Price:{response['basePrice']} \n- Volume: {volume24}\n- <a href='{hodloo_url}'>Hodloo</a> \n- Running autotrade"
-                    sd, lowest_price = self.get_stats(trading_pair)
+                    try:
+                        sd, lowest_price = self.get_stats(trading_pair)
+                    except Exception:
+                        return
                     process_autotrade_restrictions(self, trading_pair, ws, "hodloo_qfl_signals_base-break", **{"sd": sd, "current_price": alert_price, "lowest_price": lowest_price})
 
                     self.custom_telegram_msg(
@@ -108,7 +111,10 @@ class QFL_signals(SetupSignals):
                 if response["type"] == "panic":
                     strength = response["strength"]
                     message = f'\nAlert Price: {alert_price}, Volume: {volume24}, Strength: {strength}\n- <a href="{hodloo_url}">Hodloo</a>'
-                    sd, lowest_price = self.get_stats(trading_pair)
+                    try:
+                        sd, lowest_price = self.get_stats(trading_pair)
+                    except Exception:
+                        return
                     process_autotrade_restrictions(self, trading_pair, ws, "hodloo_qfl_signals_panic", **{"sd": sd, "current_price": alert_price, "lowest_price": lowest_price, "trend": "downtrend"})
 
                     self.custom_telegram_msg(
