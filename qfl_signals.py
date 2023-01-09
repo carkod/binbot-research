@@ -5,6 +5,8 @@ import threading
 import requests
 import logging
 import numpy
+import aiohttp
+
 from signals import SetupSignals
 from websocket import WebSocketApp
 from autotrade import process_autotrade_restrictions
@@ -34,10 +36,6 @@ class QFL_signals(SetupSignals):
         """
         logging.info("Active socket closed")
 
-    def on_open(self, *args, **kwargs):
-        self.load_data()
-        self.blacklist = [item["pair"] for item in self.blacklist_data]
-        
 
     def on_error(self, ws, error):
         msg = f'QFL signals Websocket error: {error}. {"Symbol: " + self.symbol if hasattr(self, "symbol") else ""  }'
@@ -129,23 +127,15 @@ class QFL_signals(SetupSignals):
                 del self.last_processed_asset[asset]
         return
 
-    def start_stream(self, ws=None):
-        if ws:
-            ws.close()
-
-        ws = WebSocketApp(
-            self.hodloo_uri,
-            on_open=self.on_open,
-            on_error=self.on_error,
-            on_close=self.on_close,
-            on_message=self.on_message,
-        )
-
-        worker_thread = threading.Thread(
-            name="qfl_signals_thread",
-            target=ws.run_forever,
-            kwargs={"ping_interval": 60},
-        )
-        worker_thread.tag = "qfl_signals_thread"
-        worker_thread.start()
-
+    async def start_stream(self):
+        session = aiohttp.ClientSession()
+        async with session.ws_connect(self.hodloo_uri) as ws:
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    if msg.data == 'close cmd':
+                        await ws.close()
+                        break
+                    else:
+                        await ws.send_str(msg["data"])
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    break

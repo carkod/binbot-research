@@ -482,7 +482,7 @@ class Autotrade(BinbotApi):
 
 
 def process_autotrade_restrictions(
-    self, symbol, ws, algorithm, test_only=False, *args, **kwargs
+    self, symbol, algorithm, test_only=False, *args, **kwargs
 ):
     """
     Refactored autotrade conditions.

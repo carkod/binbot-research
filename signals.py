@@ -3,6 +3,8 @@ import random
 import threading
 import math
 import numpy
+import os
+
 from datetime import datetime
 from time import sleep, time
 
@@ -17,6 +19,7 @@ from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
 from datetime import datetime
 from logging import info
+from binance import AsyncClient, BinanceSocketManager
 
 class SetupSignals(BinbotApi):
     def __init__(self):
@@ -206,26 +209,29 @@ class ResearchSignals(SetupSignals):
         ]
 
         return new_pairs
+    
+    async def setup_client(self):
+        client = await AsyncClient.create(os.environ["BINANCE_KEY"], os.environ["BINANCE_SECRET"])
+        socket = BinanceSocketManager(client)
+        return socket
 
-    def _run_streams(self, stream, index):
-        string_params = "/".join(stream)
-        url = f"{self.WS_BASE}{string_params}"
-        ws = WebSocketApp(
-            url,
-            on_open=self.on_open,
-            on_error=self.on_error,
-            on_close=self.on_close,
-            on_message=self.on_message,
-        )
-        ws.id = f"signal_updates_socket_{index}"
-        worker_thread = threading.Thread(
-            name=f"signal_updates{index}",
-            target=ws.run_forever
-        )
-        worker_thread.tag = "signal_updates"
-        worker_thread.start()
+    async def _run_streams(self, params, index):
+        socket = await self.setup_client()
+        klines = socket.multiplex_socket(params)
+        async with klines as k:
+            while True:
+                res = await k.recv()
+                
+                if "result" in res:
+                    print(f'Subscriptions: {res["result"]}')
 
-    def start_stream(self):
+                if "data" in res:
+                    if "e" in res["data"] and res["data"]["e"] == "kline":
+                        self.process_kline_stream(res["data"])
+                    else:
+                        print(f'Error: {res["data"]}')
+
+    async def start_stream(self):
         self.load_data()
         raw_symbols = self.ticker_price()
         if not raw_symbols:
@@ -258,38 +264,11 @@ class ResearchSignals(SetupSignals):
                 stream = params[(self.max_request + 1) :]
                 if index == 0:
                     stream = params[: self.max_request]
-                self._run_streams(stream, index)
+                await self._run_streams(stream, index)
         else:
-            self._run_streams(stream, 1)
+            await self._run_streams(stream, 1)
 
-    def on_close(self, *args):
-        """
-        Library bug not working
-        https://github.com/websocket-client/websocket-client/issues/612
-        """
-        print("Active socket closed")
-
-    def on_open(self, ws, *args, **kwargs):
-        print(f"Research signals websocket {ws.id} opened")
-
-    def on_error(self, ws, error):
-        msg = f'Research Websocket error: {error}. {"Symbol: " + self.symbol if hasattr(self, "symbol") else ""  }'
-        print(msg)
-        # API restart 30 secs + 15
-        print("Restarting in 45 seconds...")
-        sleep(45)
-
-    def on_message(self, ws, message):
-        json_response = json.loads(message)
-        response = json_response["data"]
-
-        if "result" in json_response and json_response["result"]:
-            print(f'Subscriptions: {json_response["result"]}')
-
-        elif "e" in response and response["e"] == "kline":
-            self.process_kline_stream(response, ws)
-
-    def process_kline_stream(self, result, ws):
+    def process_kline_stream(self, result):
         """
         Updates market data in DB for research
         """
@@ -307,7 +286,6 @@ class ResearchSignals(SetupSignals):
         ):
             close_price = float(result["k"]["c"])
             open_price = float(result["k"]["o"])
-            ws.symbol = symbol
             data = self._get_candlestick(symbol, self.interval, stats=True)
 
             if "error" in data and data["error"] == 1:
@@ -348,7 +326,6 @@ class ResearchSignals(SetupSignals):
                 sd,
                 self._send_msg,
                 process_autotrade_restrictions,
-                ws,
                 lowest_price
             )
 
