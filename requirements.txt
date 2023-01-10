@@ -9,3 +9,6 @@ requests-html==0.10.0
 python-telegram-bot==13.7
 whale-alert==0.0.4
 py3cw==0.0.39
+aiohttp==3.8.3
+requests-cache==0.9.
+python-binance==1.0.16

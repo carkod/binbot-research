@@ -5,9 +5,10 @@ import threading
 import requests
 import logging
 import numpy
+import aiohttp
+
 from signals import SetupSignals
 from websocket import WebSocketApp
-from decimal import Decimal
 from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
@@ -35,10 +36,6 @@ class QFL_signals(SetupSignals):
         """
         logging.info("Active socket closed")
 
-    def on_open(self, *args, **kwargs):
-        self.load_data()
-        self.blacklist = [item["pair"] for item in self.blacklist_data]
-        
 
     def on_error(self, ws, error):
         msg = f'QFL signals Websocket error: {error}. {"Symbol: " + self.symbol if hasattr(self, "symbol") else ""  }'
@@ -65,7 +62,7 @@ class QFL_signals(SetupSignals):
 
         data = self._get_candlestick(symbol, "15m")
         if "error" in data and data["error"] == 1:
-                return
+                raise Exception(f"No stats for {symbol}")
 
         list_prices = numpy.array(data["trace"][0]["close"])
         sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
@@ -81,6 +78,7 @@ class QFL_signals(SetupSignals):
             )
             asset, quote = pair.split("-")
             symbol = pair.replace("-","")
+            self.symbol = symbol
             if not is_leveraged_token and asset not in self.last_processed_asset and symbol not in self.blacklist:
 
                 hodloo_url = f"{self.hodloo_chart_url + exchange_str}:{pair}"
@@ -97,7 +95,10 @@ class QFL_signals(SetupSignals):
 
                 if response["type"] == "base-break":
                     message = f"\nAlert Price: {alert_price}\n- Base Price:{response['basePrice']} \n- Volume: {volume24}\n- <a href='{hodloo_url}'>Hodloo</a> \n- Running autotrade"
-                    sd, lowest_price = self.get_stats(trading_pair)
+                    try:
+                        sd, lowest_price = self.get_stats(trading_pair)
+                    except Exception:
+                        return
                     process_autotrade_restrictions(self, trading_pair, ws, "hodloo_qfl_signals_base-break", **{"sd": sd, "current_price": alert_price, "lowest_price": lowest_price})
 
                     self.custom_telegram_msg(
@@ -108,7 +109,10 @@ class QFL_signals(SetupSignals):
                 if response["type"] == "panic":
                     strength = response["strength"]
                     message = f'\nAlert Price: {alert_price}, Volume: {volume24}, Strength: {strength}\n- <a href="{hodloo_url}">Hodloo</a>'
-                    sd, lowest_price = self.get_stats(trading_pair)
+                    try:
+                        sd, lowest_price = self.get_stats(trading_pair)
+                    except Exception:
+                        return
                     process_autotrade_restrictions(self, trading_pair, ws, "hodloo_qfl_signals_panic", **{"sd": sd, "current_price": alert_price, "lowest_price": lowest_price, "trend": "downtrend"})
 
                     self.custom_telegram_msg(
@@ -123,23 +127,15 @@ class QFL_signals(SetupSignals):
                 del self.last_processed_asset[asset]
         return
 
-    def start_stream(self, ws=None):
-        if ws:
-            ws.close()
-
-        ws = WebSocketApp(
-            self.hodloo_uri,
-            on_open=self.on_open,
-            on_error=self.on_error,
-            on_close=self.on_close,
-            on_message=self.on_message,
-        )
-
-        worker_thread = threading.Thread(
-            name="qfl_signals_thread",
-            target=ws.run_forever,
-            kwargs={"ping_interval": 60},
-        )
-        worker_thread.tag = "qfl_signals_thread"
-        worker_thread.start()
-
+    async def start_stream(self):
+        session = aiohttp.ClientSession()
+        async with session.ws_connect(self.hodloo_uri) as ws:
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    if msg.data == 'close cmd':
+                        await ws.close()
+                        break
+                    else:
+                        await ws.send_str(msg["data"])
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    break

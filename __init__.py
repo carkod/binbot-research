@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import time
+import asyncio
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -36,21 +37,20 @@ if os.getenv("ENV") != "ci":
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown())
 
-if __name__ == "__main__":
+
+async def signals_main():
     rs = ResearchSignals()
-    rs_thread = threading.Thread(name="rs_thread", target=rs.start_stream)
-    rs_thread.start()
     qfl = QFL_signals()
-    qfl_thread = threading.Thread(name="qfl_thread", target=qfl.start_stream)
-    qfl_thread.start()
-    global stop_threads
-    stop_threads = False
+
+    await asyncio.gather(
+        rs.start_stream(),
+        qfl.start_stream(),
+    )
+
+if __name__ == "__main__":
     try:
-        # This is here to simulate application activity (which keeps the main thread alive).
-        while True:
-            time.sleep(5)
-            if stop_threads:
-                break
-    except (KeyboardInterrupt, SystemExit):
-        # Not strictly necessary if daemonic mode is enabled but should be done if possible
-        scheduler.shutdown()
+        asyncio.run(signals_main())
+    except Exception as error:
+        print(error)
+        asyncio.run(signals_main())
+
