@@ -52,7 +52,11 @@ class Autotrade(BinbotApi):
             "errors": [],
         }
         self.db_collection_name = db_collection_name
-
+        self.blacklist = None
+        blacklist_res = self.get_blacklist()
+        if not "error" in blacklist_res:
+            self.blacklist = blacklist_res["data"]
+    
     def handle_error(self, msg):
         """
         Check balance to decide balance_to_use
@@ -170,6 +174,12 @@ class Autotrade(BinbotApi):
         3. Activate bot
         """
         print(f"{self.db_collection_name} Autotrade running with {self.pair}...")
+        if self.blacklist:
+            for item in self.blacklist:
+                if item["pair"] == self.pair:
+                    print(f'Pair {self.pair} is blacklisted')
+                    break
+            return
         # Check balance, if no balance set autotrade = 0
         # Use dahsboard add quantity
         res = requests.get(url=self.bb_balance_url)

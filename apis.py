@@ -226,6 +226,11 @@ class BinbotApi(BinanceApi):
         res = get(url=self.bb_candlestick_url, params=params)
         data = handle_binance_errors(res)
         return data
+    
+    def get_blacklist(self):
+        res = get(url=f'{self.bb_blacklist_url}')
+        data = handle_binance_errors(res)
+        return data
 
 
 class CBSApi:
