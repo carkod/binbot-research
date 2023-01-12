@@ -177,10 +177,9 @@ class Autotrade(BinbotApi):
         if self.blacklist:
             for item in self.blacklist:
                 if item["pair"] == self.pair:
-                    print(f'Pair {self.pair} is blacklisted')
-                    break
-
-            return
+                    print(f"Pair {self.pair} is blacklisted")
+                    return
+            
         # Check balance, if no balance set autotrade = 0
         # Use dahsboard add quantity
         res = requests.get(url=self.bb_balance_url)
@@ -263,12 +262,17 @@ class Autotrade(BinbotApi):
             "balance_to_use"
         ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
 
-        if "sd" in kwargs:
+        if "sd" in kwargs and "current_price" in kwargs:
             sd = kwargs["sd"]
-            if (sd * 2) < 1.8:
-                self.default_bot["stop_loss"] = 1.8
-            else:
-                self.default_bot["stop_loss"] = (sd * 2)
+            self.default_bot["sd"] = sd
+            volatility = (sd / 2) / float(kwargs["current_price"])
+            if volatility < 0.018:
+                volatility = 0.018
+            elif volatility > 0.088:
+                volatility = 0.088
+
+            self.default_bot["stop_loss"] = round_numbers(volatility * 100, 2)
+
         else:
             print(
                 f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
@@ -469,10 +473,11 @@ class Autotrade(BinbotApi):
 
         if "sd" in kwargs:
             sd = kwargs["sd"]
+            self.default_bot["sd"] = sd
             if (sd * 2) < 1.8:
                 spread = 1.8
             else:
-                self.default_bot["stop_loss"] = (sd * 2)
+                self.default_bot["stop_loss"] = sd
         else:
             print(
                 f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"

@@ -1,14 +1,12 @@
 import json
 import os
 import re
-import threading
 import requests
 import logging
 import numpy
 import aiohttp
 
 from signals import SetupSignals
-from websocket import WebSocketApp
 from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
@@ -29,23 +27,8 @@ class QFL_signals(SetupSignals):
         self._send_msg(message)
         return
 
-    def on_close(self, *args):
-        """
-        Library bug not working
-        https://github.com/websocket-client/websocket-client/issues/612
-        """
-        logging.info("Active socket closed")
-
-
-    def on_error(self, ws, error):
-        msg = f'QFL signals Websocket error: {error}. {"Symbol: " + self.symbol if hasattr(self, "symbol") else ""  }'
-        logging.info(msg)
-        # API restart 30 secs + 15
-        logging.info("Restarting websockets...")
-        self.terminate_websockets()
-        self.start_stream(ws)
     
-    def check_asset(self, asset, ws):
+    def check_asset(self, asset):
         # Check if pair works with USDT, is availabee in the binance
         request_crypto = requests.get(f"https://min-api.cryptocompare.com/data/v4/all/exchanges?fsym={asset}&e=Binance").json()
         logging.info(f'Checking {asset} existence in Binance...')
@@ -69,8 +52,8 @@ class QFL_signals(SetupSignals):
         lowest_price = numpy.min(numpy.array(data["trace"][0]["close"]).astype(numpy.single))
         return sd, lowest_price
 
-    def on_message(self, ws, payload):
-        response = json.loads(payload)
+    def on_message(self, payload):
+        response = payload.json()
         if response["type"] in ["base-break", "panic"]:
             exchange_str, pair = response["marketInfo"]["ticker"].split(":")
             is_leveraged_token = bool(re.search("UP/", pair)) or bool(
@@ -86,7 +69,7 @@ class QFL_signals(SetupSignals):
                 alert_price = float(response["marketInfo"]["price"])
 
                 try:
-                    self.check_asset(asset, ws)
+                    self.check_asset(asset)
                 except Exception:
                     return
                 
@@ -131,11 +114,7 @@ class QFL_signals(SetupSignals):
         session = aiohttp.ClientSession()
         async with session.ws_connect(self.hodloo_uri) as ws:
             async for msg in ws:
-                if msg.type == aiohttp.WSMsgType.TEXT:
-                    if msg.data == 'close cmd':
-                        await ws.close()
-                        break
-                    else:
-                        await ws.send_str(msg["data"])
-                elif msg.type == aiohttp.WSMsgType.ERROR:
-                    break
+                if msg:
+                    await self.on_message(msg)
+
+                pass
