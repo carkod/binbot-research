@@ -46,7 +46,7 @@ class Autotrade(BinbotApi):
             "orders": [],
             "stop_loss": settings["stop_loss"],
             "safety_orders": [],
-            "strategy": "long",
+            "strategy": settings["strategy"],
             "short_buy_price": 0,
             "short_sell_price": 0,
             "errors": [],
