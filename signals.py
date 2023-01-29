@@ -216,7 +216,7 @@ class ResearchSignals(SetupSignals):
             print("No symbols provided by ticket_price", raw_symbols)
 
         black_list = [x["pair"] for x in self.blacklist_data]
-        markets = set([item["symbol"] for item in raw_symbols])
+        markets = set([item["symbol"] for item in raw_symbols if item["symbol"].endswith(self.settings["balance_to_use"])])
         subtract_list = set(black_list)
         list_markets = markets - subtract_list
         # Optimal setting below setting greatly reduces the websocket load
