@@ -46,7 +46,7 @@ class Autotrade(BinbotApi):
             "orders": [],
             "stop_loss": settings["stop_loss"],
             "safety_orders": [],
-            "strategy": "long",
+            "strategy": settings["strategy"],
             "short_buy_price": 0,
             "short_sell_price": 0,
             "errors": [],
@@ -177,9 +177,9 @@ class Autotrade(BinbotApi):
         if self.blacklist:
             for item in self.blacklist:
                 if item["pair"] == self.pair:
-                    print(f'Pair {self.pair} is blacklisted')
-                    break
-            return
+                    print(f"Pair {self.pair} is blacklisted")
+                    return
+            
         # Check balance, if no balance set autotrade = 0
         # Use dahsboard add quantity
         res = requests.get(url=self.bb_balance_url)
@@ -261,156 +261,24 @@ class Autotrade(BinbotApi):
         self.default_bot[
             "balance_to_use"
         ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
-
-        if "sd" in kwargs:
-            sd = kwargs["sd"]
-            if (sd * 2) < 1.8:
-                self.default_bot["stop_loss"] = 1.8
-            else:
-                self.default_bot["stop_loss"] = (sd * 2)
-        else:
-            print(
-                f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
-            )
-            return
-
-        # Create bot
-        create_bot_res = requests.post(url=bot_url, json=self.default_bot)
-        create_bot = handle_binance_errors(create_bot_res)
-
-        if "error" in create_bot and create_bot["error"] == 1:
-            print(
-                f"Test Autotrade: {create_bot['message']}",
-                f"Pair: {self.pair}.",
-            )
-            return
-
-        # Activate bot
-        botId = create_bot["botId"]
-        print(f"Trying to activate {self.db_collection_name}...")
-        res = requests.get(url=f"{activate_url}/{botId}")
-        bot = handle_binance_errors(res)
-
-        if "error" in bot and bot["error"] == 1:
-            msg = f"Error activating bot {self.pair} with id {botId}"
-            print(msg)
-            print(bot)
-            # Delete inactivatable bot
-            payload = {
-                "id": botId,
-            }
-            delete_res = requests.delete(url=bot_url, params=payload)
-            data = handle_binance_errors(delete_res)
-            print("Error trying to delete autotrade activation bot", data)
-            return
-
-        print(
-            f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
-        )
-        pass
-
-    def legacy_activate_autotrade(self, **kwargs):
-        """
-        Run autotrade
-        2. Create bot with given parameters from research_controller
-        3. Activate bot
-        """
-        print(f"{self.db_collection_name} Autotrade running with {self.pair}...")
-        # Check balance, if no balance set autotrade = 0
-        # Use dahsboard add quantity
-        res = requests.get(url=self.bb_balance_url)
-        balances = handle_binance_errors(res)
-        qty = 0
-        bot_url = self.bb_test_bot_url
-        activate_url = self.bb_activate_test_bot_url
-
-        if self.db_collection_name != "paper_trading":
-            # Get balance that match the pair
-            # Check that we have minimum binance required qty to trade
-            for b in balances["data"]:
-                if self.pair.endswith(b["asset"]):
-                    qty = supress_notation(b["free"], self.decimals)
-                    if self.min_amount_check(self.pair, qty):
-                        # balance_size_to_use = 0.0 means "Use all balance". float(0) = 0.0
-                        if float(self.default_bot["balance_size_to_use"]) != 0.0:
-                            if b["free"] < float(
-                                self.default_bot["balance_size_to_use"]
-                            ):
-                                # Display warning and continue with full balance
-                                print(
-                                    f"Error: balance ({qty}) is less than balance_size_to_use ({float(self.default_bot['balance_size_to_use'])}). Autotrade will use all balance"
-                                )
-                            else:
-                                qty = float(self.default_bot["balance_size_to_use"])
-
-                        self.default_bot["base_order_size"] = qty
-                        break
-                # If we have GBP we can trade anything
-                # And we have roughly the min BTC equivalent amount
-                if (
-                    self.settings["balance_to_use"] == "GBP"
-                    and b["asset"] == "GBP"
-                    # Trading with less than 40 GBP will not be profitable
-                    and float(b["free"]) > 40
-                ):
-                    base_asset = self.find_quoteAsset(self.pair)
-                    # e.g. XRPBTC
-                    if base_asset == "GBP":
-                        self.default_bot["base_order_size"] = b["free"]
-                        break
-                    try:
-                        rate = self.ticker_price(f"{base_asset}GBP")
-                    except InvalidSymbol:
-                        msg = f"Cannot trade {self.pair} with GBP. Adding to blacklist"
-                        self.handle_error(msg)
-                        self.add_to_blacklist(self.pair, msg)
-                        print(msg)
-                        return
-
-                    rate = rate["price"]
-                    qty = supress_notation(b["free"], self.decimals)
-                    # Round down to 6 numbers to avoid not enough funds
-                    try:
-                        base_order_size = (
-                            math.floor((float(qty) / float(rate)) * 10000000) / 10000000
-                        )
-                    except Exception as error:
-                        print(error)
-                    self.default_bot.base_order_size = supress_notation(
-                        base_order_size, self.decimals
-                    )
-                    pass
-
-            # Dynamic switch to real bot URLs
-            bot_url = self.bb_bot_url
-            activate_url = self.bb_activate_bot_url
-
-        # Can't get balance qty, because balance = 0 if real bot is trading
-        # Base order set to default 1 to avoid errors
-        # and because there is no matching engine endpoint to get market qty
-        # So deal base_order should update this to the correct amount
-        if self.db_collection_name == "bots":
-            self.default_bot["base_order_size"] = self.settings["base_order_size"]
-        else:
-            self.default_bot["base_order_size"] = "15"  # min USDT order = 15
-
-        self.default_bot[
-            "balance_to_use"
-        ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
-        self.default_bot["stop_loss"] = 0  # Using safety orders instead of stop_loss
-        # set default static trailling_deviation
+        self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
 
         if "sd" in kwargs and "current_price" in kwargs:
-            # dynamic take profit trailling_deviation, changes according to standard deviation
-            spread = (kwargs["sd"] * 2) / kwargs["current_price"]
-            self.default_bot["trailling_deviation"] = float(spread * 100)
-        else:
-            self.default_bot["trailling_deviation"] = float(
-                self.settings["trailling_deviation"]
-            )
+            sd = kwargs["sd"]
+            self.default_bot["sd"] = sd
+            volatility = (sd / 2) / float(kwargs["current_price"])
+            if volatility < 0.018:
+                volatility = 0.018
+            elif volatility > 0.06:
+                volatility = 0.06
 
-        if "strategy" in kwargs:
-            self.default_bot["strategy"] = kwargs["strategy"]
+            self.default_bot["stop_loss"] = round_numbers(volatility * 100, 2)
+
+        else:
+            print(
+                f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
+            )
+            return
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
@@ -425,9 +293,6 @@ class Autotrade(BinbotApi):
 
         # Activate bot
         botId = create_bot["botId"]
-        if "error" in create_bot and create_bot["error"] == 0:
-            print(create_bot["message"])
-            return
         print(f"Trying to activate {self.db_collection_name}...")
         res = requests.get(url=f"{activate_url}/{botId}")
         bot = handle_binance_errors(res)
@@ -445,51 +310,10 @@ class Autotrade(BinbotApi):
             print("Error trying to delete autotrade activation bot", data)
             return
 
-        # Now that we have base_order price reactivate safety orders, stop loss and dynamic trailling_profit
-        new_bot_res = requests.get(url=f"{activate_url}/{botId}")
-        bot = handle_binance_errors(new_bot_res)
-
-        if "error" in bot and bot["error"] == 1:
-            print(f"Test Autotrade: {bot['message']}", f"Pair: {self.pair}.")
-            return
-        bot = bot["data"]
-        self.default_bot.update(bot)
-        self.default_bot.pop("_id")
-        base_order_price = bot["deal"]["buy_price"]
-
-        trend = "upward"
-        lowest_price = 0
-        sd = 0
-        if "trend" in kwargs:
-            trend = kwargs["trend"]
-
-        if "lowest_price" in kwargs:
-            lowest_price = kwargs["lowest_price"]
-
-        if "sd" in kwargs:
-            sd = kwargs["sd"]
-            if (sd * 2) < 1.8:
-                spread = 1.8
-            else:
-                self.default_bot["stop_loss"] = (sd * 2)
-        else:
-            print(
-                f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
-            )
-            return
-
-        edit_bot_res = requests.put(url=f"{bot_url}/{botId}", json=self.default_bot)
-        edit_bot = handle_binance_errors(edit_bot_res)
-
-        if "error" in edit_bot and edit_bot["error"] == 1:
-            print(f"Test Autotrade: {edit_bot['message']}", f"Pair: {self.pair}.")
-            return
-
         print(
             f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
         )
         pass
-
 
 def process_autotrade_restrictions(
     self, symbol, algorithm, test_only=False, *args, **kwargs

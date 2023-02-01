@@ -1,25 +1,19 @@
-import json
-import random
-import threading
 import math
-import numpy
 import os
-
+import random
 from datetime import datetime
+from logging import info
 from time import sleep, time
 
-
+import numpy
 import requests
-from websocket import WebSocketApp
-
 from algorithms.ma_candlestick_jump import ma_candlestick_jump
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
+from binance import AsyncClient, BinanceSocketManager
 from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
-from datetime import datetime
-from logging import info
-from binance import AsyncClient, BinanceSocketManager
+
 
 class SetupSignals(BinbotApi):
     def __init__(self):
@@ -38,26 +32,6 @@ class SetupSignals(BinbotApi):
         self.blacklist_data = []
         self.test_autotrade_settings = {}
         self.settings = {}
-
-    def terminate_websockets(self, thread_name="market_updates"):
-        """
-        Close websockets through threads
-        """
-        info("Starting thread cleanup")
-        global stop_threads
-        stop_threads = True
-        # Notify market updates websockets to update
-        for thread in threading.enumerate():
-            if (
-                hasattr(thread, "tag")
-                and thread_name in thread.name
-                and hasattr(thread, "_target")
-            ):
-                stop_threads = False
-                print(f"Closing websockets {thread._target.__self__} on thread {thread.name}")
-                thread._target.__self__.close()
-
-        pass
 
     def _send_msg(self, msg):
         """
@@ -143,7 +117,9 @@ class SetupSignals(BinbotApi):
         pass
 
     def post_error(self, msg):
-        res = requests.put(url=self.bb_autotrade_settings_url, json={"system_logs": msg})
+        res = requests.put(
+            url=self.bb_autotrade_settings_url, json={"system_logs": msg}
+        )
         handle_binance_errors(res)
         return
 
@@ -209,9 +185,11 @@ class ResearchSignals(SetupSignals):
         ]
 
         return new_pairs
-    
+
     async def setup_client(self):
-        client = await AsyncClient.create(os.environ["BINANCE_KEY"], os.environ["BINANCE_SECRET"])
+        client = await AsyncClient.create(
+            os.environ["BINANCE_KEY"], os.environ["BINANCE_SECRET"]
+        )
         socket = BinanceSocketManager(client)
         return socket
 
@@ -221,7 +199,7 @@ class ResearchSignals(SetupSignals):
         async with klines as k:
             while True:
                 res = await k.recv()
-                
+
                 if "result" in res:
                     print(f'Subscriptions: {res["result"]}')
 
@@ -238,7 +216,7 @@ class ResearchSignals(SetupSignals):
             print("No symbols provided by ticket_price", raw_symbols)
 
         black_list = [x["pair"] for x in self.blacklist_data]
-        markets = set([item["symbol"] for item in raw_symbols])
+        markets = set([item["symbol"] for item in raw_symbols if item["symbol"].endswith(self.settings["balance_to_use"])])
         subtract_list = set(black_list)
         list_markets = markets - subtract_list
         # Optimal setting below setting greatly reduces the websocket load
@@ -313,8 +291,10 @@ class ResearchSignals(SetupSignals):
             sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
 
             # historical lowest for short_buy_price
-            lowest_price = numpy.min(numpy.array(data["trace"][0]["close"]).astype(numpy.single))
-            
+            lowest_price = numpy.min(
+                numpy.array(data["trace"][0]["close"]).astype(numpy.single)
+            )
+
             ma_candlestick_jump(
                 self,
                 close_price,
@@ -326,13 +306,16 @@ class ResearchSignals(SetupSignals):
                 sd,
                 self._send_msg,
                 process_autotrade_restrictions,
-                lowest_price
+                lowest_price,
             )
 
             self.last_processed_kline[symbol] = time()
 
         # If more than 6 hours passed has passed
         # Then we should resume sending signals for given symbol
-        if symbol in self.last_processed_kline and (float(time()) - float(self.last_processed_kline[symbol])) > 6000:
+        if (
+            symbol in self.last_processed_kline
+            and (float(time()) - float(self.last_processed_kline[symbol])) > 6000
+        ):
             del self.last_processed_kline[symbol]
         pass
