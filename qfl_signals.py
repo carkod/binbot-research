@@ -114,17 +114,17 @@ class QFL_signals(SetupSignals):
                         sd, lowest_price = self.get_stats(trading_pair)
                     except Exception:
                         return
-                    process_autotrade_restrictions(
-                        self,
-                        trading_pair,
-                        "hodloo_qfl_signals_panic",
-                        **{
-                            "sd": sd,
-                            "current_price": alert_price,
-                            "lowest_price": lowest_price,
-                            "trend": "downtrend",
-                        },
-                    )
+                    # process_autotrade_restrictions(
+                    #     self,
+                    #     trading_pair,
+                    #     "hodloo_qfl_signals_panic",
+                    #     **{
+                    #         "sd": sd,
+                    #         "current_price": alert_price,
+                    #         "lowest_price": lowest_price,
+                    #         "trend": "downtrend",
+                    #     },
+                    # )
 
                     self.custom_telegram_msg(
                         f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message} -\n lowest price: {lowest_price}",
