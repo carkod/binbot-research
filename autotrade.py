@@ -262,6 +262,7 @@ class Autotrade(BinbotApi):
             "balance_to_use"
         ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
         self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
+        self.default_bot["dynamic_trailling"] = True
 
         if "sd" in kwargs and "current_price" in kwargs:
             sd = kwargs["sd"]
