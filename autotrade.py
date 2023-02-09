@@ -280,6 +280,9 @@ class Autotrade(BinbotApi):
                 f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
             )
             return
+    
+        if "trend" in kwargs and kwargs["trend"] == "downtrend":
+            self.default_bot["strategy"] = "margin_short"
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)

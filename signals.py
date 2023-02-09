@@ -8,6 +8,7 @@ from time import sleep, time
 import numpy
 import requests
 from algorithms.ma_candlestick_jump import ma_candlestick_jump
+from algorithms.ma_candlestick_drop import ma_candlestick_drop
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
 from binance import AsyncClient, BinanceSocketManager
@@ -218,7 +219,8 @@ class ResearchSignals(SetupSignals):
         black_list = [x["pair"] for x in self.blacklist_data]
         markets = set([item["symbol"] for item in raw_symbols if item["symbol"].endswith(self.settings["balance_to_use"])])
         subtract_list = set(black_list)
-        list_markets = markets - subtract_list
+        # list_markets = markets - subtract_list
+        list_markets = ["FILUSDT"]
         # Optimal setting below setting greatly reduces the websocket load
         # To make it faster to scan and reduce chances of being blocked by Binance
         if self.settings and self.settings["balance_to_use"] != "GBP":
@@ -295,19 +297,35 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            ma_candlestick_jump(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-            )
+            # ma_candlestick_jump(
+            #     self,
+            #     close_price,
+            #     open_price,
+            #     ma_7,
+            #     ma_100,
+            #     ma_25,
+            #     symbol,
+            #     sd,
+            #     self._send_msg,
+            #     process_autotrade_restrictions,
+            #     lowest_price,
+            # )
+
+            # WIP
+            if os.getenv("ENV") == "development":
+                ma_candlestick_drop(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                )
 
             self.last_processed_kline[symbol] = time()
 
