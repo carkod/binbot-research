@@ -9,7 +9,7 @@ import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from algorithms.new_tokens import NewTokens
-from algorithms.whale_alert_signals import WhaleAlertSignals
+# from algorithms.whale_alert_signals import WhaleAlertSignals
 from qfl_signals import QFL_signals
 from signals import ResearchSignals
 
@@ -26,13 +26,13 @@ if os.getenv("ENV") != "ci":
         trigger="interval",
         hours=6,
     )
-    wa = WhaleAlertSignals()
-    scheduler.add_job(
-        func=wa.run_bot,
-        timezone="Europe/London",
-        trigger="interval",
-        hours=6,
-    )
+    # wa = WhaleAlertSignals()
+    # scheduler.add_job(
+    #     func=wa.run_bot,
+    #     timezone="Europe/London",
+    #     trigger="interval",
+    #     hours=6,
+    # )
 
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown())

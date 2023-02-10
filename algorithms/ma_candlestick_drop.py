@@ -12,7 +12,10 @@ def ma_candlestick_drop(
     sd,
     _send_msg,
     run_autotrade,
-    lowest_price
+    lowest_price,
+    slope,
+    p_value,
+    r_value
 ):
     """
     Opposite algorithm of ma_candletick_jump
@@ -22,16 +25,16 @@ def ma_candlestick_drop(
     """
     if (
         float(close_price) < float(open_price)
-        # and sd > 0.09
-        # and close_price < ma_7[len(ma_7) - 1]
-        # and open_price < ma_7[len(ma_7) - 1]
-        # and close_price < ma_25[len(ma_25) - 1]
-        # and open_price < ma_25[len(ma_25) - 1]
-        # and ma_7[len(ma_7) - 1] < ma_7[len(ma_7) - 2]
-        # and close_price < ma_7[len(ma_7) - 2]
-        # and open_price < ma_7[len(ma_7) - 2]
-        # and close_price < ma_100[len(ma_100) - 1]
-        # and open_price < ma_100[len(ma_100) - 1]
+        and sd > 0.09
+        and close_price < ma_7[len(ma_7) - 1]
+        and open_price < ma_7[len(ma_7) - 1]
+        and close_price < ma_25[len(ma_25) - 1]
+        and open_price < ma_25[len(ma_25) - 1]
+        and ma_7[len(ma_7) - 1] < ma_7[len(ma_7) - 2]
+        and close_price < ma_7[len(ma_7) - 2]
+        and open_price < ma_7[len(ma_7) - 2]
+        and close_price < ma_100[len(ma_100) - 1]
+        and open_price < ma_100[len(ma_100) - 1]
         # remove high standard deviation
         and float(sd) / float(close_price) < 0.07
     ):
@@ -42,12 +45,15 @@ def ma_candlestick_drop(
 - SD {sd}
 - Percentage volatility: {(sd) / float(close_price)}
 - Percentage volatility x2: {sd * 2 / float(close_price)}
+- Slope: {slope}
+- P-value: {p_value}
+- Pearson correlation: {r_value}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
         _send_msg(msg)
         print(msg)
 
-        run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend",})
+        run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
 
     return
