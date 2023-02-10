@@ -64,6 +64,6 @@ def ma_candlestick_jump(
 
         trend = "uptrend" if slope > 0 else "downtrend"
 
-        run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
+        run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "uptrend"})
 
     return

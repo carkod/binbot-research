@@ -25,7 +25,7 @@ def ma_candlestick_drop(
     """
     if (
         float(close_price) < float(open_price)
-        and sd > 0.09
+        # and sd > 0.09
         and close_price < ma_7[len(ma_7) - 1]
         and open_price < ma_7[len(ma_7) - 1]
         and close_price < ma_25[len(ma_25) - 1]
@@ -53,7 +53,8 @@ def ma_candlestick_drop(
 """)
         _send_msg(msg)
         print(msg)
+        trend = "uptrend" if slope > 0 else "downtrend"
 
-        run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
+        run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
 
     return

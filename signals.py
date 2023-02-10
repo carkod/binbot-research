@@ -6,16 +6,17 @@ from logging import info
 from time import sleep, time
 
 import numpy
+import pandas as pd
 import requests
-from algorithms.ma_candlestick_jump import ma_candlestick_jump
 from algorithms.ma_candlestick_drop import ma_candlestick_drop
+from algorithms.ma_candlestick_jump import ma_candlestick_jump
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
 from binance import AsyncClient, BinanceSocketManager
+from scipy import stats
 from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
-from scipy import stats
-from pandas import pd
+
 
 class SetupSignals(BinbotApi):
     def __init__(self):
@@ -218,7 +219,13 @@ class ResearchSignals(SetupSignals):
             print("No symbols provided by ticket_price", raw_symbols)
 
         black_list = [x["pair"] for x in self.blacklist_data]
-        markets = set([item["symbol"] for item in raw_symbols if item["symbol"].endswith(self.settings["balance_to_use"])])
+        markets = set(
+            [
+                item["symbol"]
+                for item in raw_symbols
+                if item["symbol"].endswith(self.settings["balance_to_use"])
+            ]
+        )
         subtract_list = set(black_list)
         list_markets = markets - subtract_list
         # Optimal setting below setting greatly reduces the websocket load
@@ -268,8 +275,15 @@ class ResearchSignals(SetupSignals):
             open_price = float(result["k"]["o"])
             data = self._get_candlestick(symbol, self.interval, stats=True)
 
-            df = pd.DataFrame({"date": data["trace"][0]["x"], "close": numpy.array(data["trace"][0]["close"]).astype(float)})
-            slope, intercept, rvalue, pvalue, stderr = stats.linregress(df["date"], df["close"])
+            df = pd.DataFrame(
+                {
+                    "date": data["trace"][0]["x"],
+                    "close": numpy.array(data["trace"][0]["close"]).astype(float),
+                }
+            )
+            slope, intercept, rvalue, pvalue, stderr = stats.linregress(
+                df["date"], df["close"]
+            )
 
             if "error" in data and data["error"] == 1:
                 return
@@ -314,27 +328,25 @@ class ResearchSignals(SetupSignals):
                 lowest_price,
                 slope=slope,
                 p_value=pvalue,
-                r_value=rvalue
+                r_value=rvalue,
             )
 
-            # WIP
-            if os.getenv("ENV") == "development":
-                ma_candlestick_drop(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope=slope,
-                    p_value=pvalue,
-                    r_value=rvalue
-                )
+            ma_candlestick_drop(
+                self,
+                close_price,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                slope=slope,
+                p_value=pvalue,
+                r_value=rvalue,
+            )
 
             self.last_processed_kline[symbol] = time()
 

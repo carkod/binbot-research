@@ -282,6 +282,11 @@ class Autotrade(BinbotApi):
             return
     
         if "trend" in kwargs and kwargs["trend"] == "downtrend":
+            # Temporary restriction to avoid using real money
+            if self.db_collection_name == "bots":
+                print("Margin short is still WIP, not proceeding with autotrade with real bots")
+                return
+
             self.default_bot["strategy"] = "margin_short"
 
         # Create bot
@@ -290,7 +295,7 @@ class Autotrade(BinbotApi):
 
         if "error" in create_bot and create_bot["error"] == 1:
             print(
-                f"Test Autotrade: {create_bot['message']}",
+                f"Autotrade: {create_bot['message']}",
                 f"Pair: {self.pair}.",
             )
             return
@@ -372,7 +377,8 @@ def process_autotrade_restrictions(
         print(f"Not enough funds to autotrade [bots].")
         return
 
-    if int(self.settings["autotrade"]) == 1 and not test_only:
+    if (int(self.settings["autotrade"]) == 1
+        and not test_only):
         if self.reached_max_active_autobots("bots"):
             print("Reached maximum number of active bots set in controller settings")
         else:
