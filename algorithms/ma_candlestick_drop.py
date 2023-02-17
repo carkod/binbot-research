@@ -25,7 +25,7 @@ def ma_candlestick_drop(
     """
     if (
         float(close_price) < float(open_price)
-        # and sd > 0.09
+        and sd > 0.09
         and close_price < ma_7[len(ma_7) - 1]
         and open_price < ma_7[len(ma_7) - 1]
         and close_price < ma_25[len(ma_25) - 1]

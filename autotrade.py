@@ -240,7 +240,7 @@ class Autotrade(BinbotApi):
                         )
                     except Exception as error:
                         print(error)
-                    self.default_bot.base_order_size = supress_notation(
+                    self.default_bot["base_order_size"] = supress_notation(
                         base_order_size, self.decimals
                     )
                     pass
@@ -288,6 +288,9 @@ class Autotrade(BinbotApi):
                 return
 
             self.default_bot["strategy"] = "margin_short"
+            margin_short_volatility = round_numbers((sd / float(kwargs["current_price"])) * 100, 2)
+            self.default_bot["stop_loss"] = margin_short_volatility
+            self.default_bot["take_profit"] = margin_short_volatility
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
