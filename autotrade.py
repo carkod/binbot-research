@@ -287,8 +287,12 @@ class Autotrade(BinbotApi):
                 print("Margin short is still WIP, not proceeding with autotrade with real bots")
                 return
 
+            if not sd:
+                margin_short_volatility = 2.3
+            else:
+                margin_short_volatility = round_numbers((sd / float(kwargs["current_price"])) * 100, 2)
+
             self.default_bot["strategy"] = "margin_short"
-            margin_short_volatility = round_numbers((sd / float(kwargs["current_price"])) * 100, 2)
             self.default_bot["stop_loss"] = margin_short_volatility
             self.default_bot["take_profit"] = margin_short_volatility
 
