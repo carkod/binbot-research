@@ -1,7 +1,7 @@
 import math
 import os
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
 
@@ -35,6 +35,7 @@ class SetupSignals(BinbotApi):
         self.blacklist_data = []
         self.test_autotrade_settings = {}
         self.settings = {}
+        self.market_analyses_timestamp = datetime.now() + timedelta(hours=1)
 
     def _send_msg(self, msg):
         """
@@ -255,6 +256,42 @@ class ResearchSignals(SetupSignals):
         else:
             await self._run_streams(stream, 1)
 
+    def market_analyses(self):
+        """
+        Use gainers and losers endpoint to analyze market trends
+
+        We want to know when it's more suitable to do long positions
+        when it's more suitable to do short positions
+        For now setting threshold to 70% i.e.
+        if > 70% of assets in a given market (USDT) are uptrend
+        if < 70% of assets in a given market are downtrend
+        Establish the timing
+        """
+        data = self.gainers_a_losers()
+        gainers = 0
+        losers = 0
+        for item in data["data"]:
+            if float(item["priceChangePercent"]) > 0:
+                gainers += 1
+            elif float(item["priceChangePercent"]) == 0:
+                continue
+            else:
+                losers += 1
+        
+        total = gainers + losers
+        perc_gainers = (gainers / total) * 100
+        perc_losers = (losers / total) * 100
+
+        if perc_gainers > 0.7:
+            print("USDT market is uptrend")
+            return "uptrend"
+    
+        if perc_losers > 0.7:
+            print("USDT market is downtrend")
+            return "uptrend"
+
+        return None
+
     def process_kline_stream(self, result):
         """
         Updates market data in DB for research
@@ -294,14 +331,7 @@ class ResearchSignals(SetupSignals):
 
             if len(ma_100) == 0:
                 msg = f"Not enough ma_100 data: {symbol}"
-                info(msg)
-                if random.randint(0, 20) == 15:
-                    info("Cleaning db of incomplete data...")
-                    delete_klines_res = requests.delete(
-                        url=self.bb_candlestick_url, params={"symbol": symbol}
-                    )
-                    result = handle_binance_errors(delete_klines_res)
-                    self.last_processed_kline[symbol] = time()
+                print(msg)
                 return
 
             # Average amplitude
@@ -347,6 +377,14 @@ class ResearchSignals(SetupSignals):
                 p_value=pvalue,
                 r_value=rvalue,
             )
+
+
+            if datetime.now() >= self.market_analyses_timestamp:
+                trend = self.market_analyses()
+                if trend:
+                    self._send_msg(f'[{datetime.now()}] Current USDT market trend is: {trend}')
+                    self.market_analyses_timestamp = datetime.now() + timedelta(hours=1)
+
 
             self.last_processed_kline[symbol] = time()
 
