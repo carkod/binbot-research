@@ -282,11 +282,11 @@ class ResearchSignals(SetupSignals):
         perc_gainers = (gainers / total) * 100
         perc_losers = (losers / total) * 100
 
-        if perc_gainers > 0.7:
+        if perc_gainers > 70:
             self.market_trend = "gainers"
             return
     
-        if perc_losers > 0.7:
+        if perc_losers > 70:
             self.market_trend = "losers"
             return
 

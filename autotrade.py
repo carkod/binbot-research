@@ -273,8 +273,6 @@ class Autotrade(BinbotApi):
             elif volatility > 0.06:
                 volatility = 0.06
 
-            self.default_bot["stop_loss"] = round_numbers(volatility * 100, 2)
-
         else:
             print(
                 f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
@@ -293,7 +291,6 @@ class Autotrade(BinbotApi):
                 margin_short_volatility = round_numbers((sd / float(kwargs["current_price"])) * 100, 2)
 
             self.default_bot["strategy"] = "margin_short"
-            self.default_bot["stop_loss"] = margin_short_volatility
             self.default_bot["take_profit"] = margin_short_volatility
 
         # Create bot
