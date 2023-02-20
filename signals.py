@@ -30,12 +30,10 @@ class SetupSignals(BinbotApi):
         self.telegram_bot = TelegramBot()
         self.max_request = 950  # Avoid HTTP 411 error by separating streams
         self.active_symbols = []
-        self.thread_ids = []
         self.active_test_bots = []
         self.blacklist_data = []
         self.test_autotrade_settings = {}
         self.settings = {}
-        self.market_analyses_timestamp = datetime.now() + timedelta(hours=1)
 
     def _send_msg(self, msg):
         """
@@ -172,6 +170,8 @@ class ResearchSignals(SetupSignals):
     def __init__(self):
         info("Started research signals")
         self.last_processed_kline = {}
+        self.market_analyses_timestamp = datetime.now()
+        self.market_trend = None
         super().__init__()
 
     def new_tokens(self, projects) -> list:
@@ -283,14 +283,15 @@ class ResearchSignals(SetupSignals):
         perc_losers = (losers / total) * 100
 
         if perc_gainers > 0.7:
-            print("USDT market is uptrend")
-            return "uptrend"
+            self.market_trend = "gainers"
+            return
     
         if perc_losers > 0.7:
-            print("USDT market is downtrend")
-            return "uptrend"
+            self.market_trend = "losers"
+            return
 
-        return None
+        self.market_trend = None
+        return
 
     def process_kline_stream(self, result):
         """
@@ -344,46 +345,49 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            ma_candlestick_jump(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope=slope,
-                p_value=pvalue,
-                r_value=rvalue,
-            )
+            if self.market_trend == "gainers":
+                ma_candlestick_jump(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope=slope,
+                    p_value=pvalue,
+                    r_value=rvalue,
+                )
 
-            ma_candlestick_drop(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope=slope,
-                p_value=pvalue,
-                r_value=rvalue,
-            )
+            if self.market_trend == "losers":
+                ma_candlestick_drop(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope=slope,
+                    p_value=pvalue,
+                    r_value=rvalue,
+                )
 
 
             if datetime.now() >= self.market_analyses_timestamp:
                 trend = self.market_analyses()
                 if trend:
-                    self._send_msg(f'[{datetime.now()}] Current USDT market trend is: {trend}')
-                    self.market_analyses_timestamp = datetime.now() + timedelta(hours=1)
+                    print(f'[{datetime.now()}] Current USDT market trend is: {self.market_trend}')
+                    self._send_msg(f'[{datetime.now()}] Current USDT market #trend is domainted by {self.market_trend}')
+                    self.market_analyses_timestamp = datetime.now() + timedelta(minutes=15)
 
 
             self.last_processed_kline[symbol] = time()
