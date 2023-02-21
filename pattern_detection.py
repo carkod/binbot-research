@@ -220,33 +220,3 @@ def chaikin_oscillator(data, volume):
     last_value = real[len(real) - 1]
     previous_last = real[len(real) - 2]
     return last_value - (previous_last), last_value
-
-def linear_regression(data):
-    """
-    Create linear regression equation y = X1*x + Intercept
-    The larger X1, the quicker prices are increasing, and viceversa
-    Larger intercept means higher starting point
-    Args:
-    data: Candlestick data (Open, High, Low, Close)
-    @returns
-    string which contains an equation of the format y = X1x + i. Potentially can draw a graph
-    """
-    close = numpy.asarray(data["close"], dtype='f8')
-
-    slope = talib.LINEARREG_SLOPE(close, timeperiod=25)
-    intercept = talib.LINEARREG_INTERCEPT(close, timeperiod=25)
-    last_slope = slope.tolist()[len(slope) - 1]
-    last_intercept = intercept.tolist()[len(intercept) - 1]
-
-    return last_slope, last_intercept
-
-def stdev(data):
-    """
-    TA-lib returns 0.0 for a lot of data
-    Use numpy std instead
-    """
-
-    close = numpy.asarray(data["close"], dtype='f8')
-
-    standard_deviation = numpy.std(close)
-    return standard_deviation

@@ -383,11 +383,10 @@ class ResearchSignals(SetupSignals):
 
 
             if datetime.now() >= self.market_analyses_timestamp:
-                trend = self.market_analyses()
-                if trend:
-                    print(f'[{datetime.now()}] Current USDT market trend is: {self.market_trend}')
-                    self._send_msg(f'[{datetime.now()}] Current USDT market #trend is domainted by {self.market_trend}')
-                    self.market_analyses_timestamp = datetime.now() + timedelta(minutes=15)
+                self.market_analyses()
+                print(f'[{datetime.now()}] Current USDT market trend is: {self.market_trend}')
+                self._send_msg(f'[{datetime.now()}] Current USDT market #trend is domainted by {self.market_trend}')
+                self.market_analyses_timestamp = datetime.now() + timedelta(minutes=15)
 
 
             self.last_processed_kline[symbol] = time()
