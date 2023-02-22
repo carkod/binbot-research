@@ -10,6 +10,7 @@ from signals import SetupSignals
 from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
+from scipy.stats import linregress
 
 
 class QFL_signals(SetupSignals):
@@ -49,12 +50,14 @@ class QFL_signals(SetupSignals):
         if "error" in data and data["error"] == 1:
             raise Exception(f"No stats for {symbol}")
 
-        list_prices = numpy.array(data["trace"][0]["close"])
+        list_prices = numpy.array(data["trace"][0]["close"]).astype(numpy.single)
         sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
         lowest_price = numpy.min(
             numpy.array(data["trace"][0]["close"]).astype(numpy.single)
         )
-        return sd, lowest_price
+        dates = numpy.array(data["trace"][0]["x"])
+        slope, intercept, rvalue, pvalue, stderr = linregress(dates, list_prices)
+        return sd, lowest_price, slope
 
     async def on_message(self, payload):
         response = payload.json()
@@ -87,22 +90,38 @@ class QFL_signals(SetupSignals):
                 if response["type"] == "base-break":
                     message = f"\nAlert Price: {alert_price}\n- Base Price:{response['basePrice']} \n- Volume: {volume24}\n- <a href='{hodloo_url}'>Hodloo</a> \n- Running autotrade"
                     try:
-                        sd, lowest_price = self.get_stats(trading_pair)
+                        sd, lowest_price, slope = self.get_stats(trading_pair)
                     except Exception:
                         return
-                    process_autotrade_restrictions(
-                        self,
-                        trading_pair,
-                        "hodloo_qfl_signals_base-break",
-                        **{
-                            "sd": sd,
-                            "current_price": alert_price,
-                            "lowest_price": lowest_price,
-                        },
-                    )
+                    
+                    if slope > 0:
+                        process_autotrade_restrictions(
+                            self,
+                            trading_pair,
+                            "hodloo_qfl_signals_base-break",
+                            **{
+                                "sd": sd,
+                                "current_price": alert_price,
+                                "lowest_price": lowest_price,
+                                "trend": "uptrend"
+                            },
+                        )
+                    else:
+                        process_autotrade_restrictions(
+                            self,
+                            trading_pair,
+                            "hodloo_qfl_signals_base-break",
+                            test_only=True,
+                            **{
+                                "sd": sd,
+                                "current_price": alert_price,
+                                "lowest_price": lowest_price,
+                                "trend": "downtrend"
+                            },
+                        )
 
                     self.custom_telegram_msg(
-                        f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message} -\n lowest price: {lowest_price}",
+                        f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message} -\n lowest price: {lowest_price} -\n sd: {sd} -\n slope: {slope}",
                         symbol=trading_pair,
                     )
 
@@ -111,20 +130,35 @@ class QFL_signals(SetupSignals):
                     strength = response["strength"]
                     message = f'\nAlert Price: {alert_price}, Volume: {volume24}, Strength: {strength}\n- <a href="{hodloo_url}">Hodloo</a>'
                     try:
-                        sd, lowest_price = self.get_stats(trading_pair)
+                        sd, lowest_price, slope = self.get_stats(trading_pair)
                     except Exception:
                         return
-                    # process_autotrade_restrictions(
-                    #     self,
-                    #     trading_pair,
-                    #     "hodloo_qfl_signals_panic",
-                    #     **{
-                    #         "sd": sd,
-                    #         "current_price": alert_price,
-                    #         "lowest_price": lowest_price,
-                    #         "trend": "downtrend",
-                    #     },
-                    # )
+
+                    if slope > 0:
+                        process_autotrade_restrictions(
+                            self,
+                            trading_pair,
+                            "hodloo_qfl_signals_base-break",
+                            **{
+                                "sd": sd,
+                                "current_price": alert_price,
+                                "lowest_price": lowest_price,
+                                "trend": "uptrend"
+                            },
+                        )
+                    else:
+                        process_autotrade_restrictions(
+                            self,
+                            trading_pair,
+                            "hodloo_qfl_signals_panic",
+                            test_only=True,
+                            **{
+                                "sd": sd,
+                                "current_price": alert_price,
+                                "lowest_price": lowest_price,
+                                "trend": "downtrend",
+                            },
+                        )
 
                     self.custom_telegram_msg(
                         f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message} -\n lowest price: {lowest_price}",
