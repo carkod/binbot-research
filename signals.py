@@ -345,41 +345,41 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            if self.market_trend == "gainers":
-                ma_candlestick_jump(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope=slope,
-                    p_value=pvalue,
-                    r_value=rvalue,
-                )
+            # if self.market_trend == "gainers":
+            #     ma_candlestick_jump(
+            #         self,
+            #         close_price,
+            #         open_price,
+            #         ma_7,
+            #         ma_100,
+            #         ma_25,
+            #         symbol,
+            #         sd,
+            #         self._send_msg,
+            #         process_autotrade_restrictions,
+            #         lowest_price,
+            #         slope=slope,
+            #         p_value=pvalue,
+            #         r_value=rvalue,
+            #     )
 
-            if self.market_trend == "losers":
-                ma_candlestick_drop(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope=slope,
-                    p_value=pvalue,
-                    r_value=rvalue,
-                )
+            # if self.market_trend == "losers":
+            #     ma_candlestick_drop(
+            #         self,
+            #         close_price,
+            #         open_price,
+            #         ma_7,
+            #         ma_100,
+            #         ma_25,
+            #         symbol,
+            #         sd,
+            #         self._send_msg,
+            #         process_autotrade_restrictions,
+            #         lowest_price,
+            #         slope=slope,
+            #         p_value=pvalue,
+            #         r_value=rvalue,
+            #     )
 
             if datetime.now() >= self.market_analyses_timestamp:
                 self.market_analyses()
