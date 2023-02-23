@@ -277,7 +277,7 @@ class ResearchSignals(SetupSignals):
                 continue
             else:
                 losers += 1
-        
+
         total = gainers + losers
         perc_gainers = (gainers / total) * 100
         perc_losers = (losers / total) * 100
@@ -285,7 +285,7 @@ class ResearchSignals(SetupSignals):
         if perc_gainers > 70:
             self.market_trend = "gainers"
             return
-    
+
         if perc_losers > 70:
             self.market_trend = "losers"
             return
@@ -381,13 +381,15 @@ class ResearchSignals(SetupSignals):
                     r_value=rvalue,
                 )
 
-
             if datetime.now() >= self.market_analyses_timestamp:
                 self.market_analyses()
-                print(f'[{datetime.now()}] Current USDT market trend is: {self.market_trend}')
-                self._send_msg(f'[{datetime.now()}] Current USDT market #trend is domainted by {self.market_trend}')
+                print(
+                    f"[{datetime.now()}] Current USDT market trend is: {self.market_trend}"
+                )
+                self._send_msg(
+                    f"[{datetime.now()}] Current USDT market #trend is domainted by {self.market_trend}"
+                )
                 self.market_analyses_timestamp = datetime.now() + timedelta(minutes=15)
-
 
             self.last_processed_kline[symbol] = time()
 
