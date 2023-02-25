@@ -121,7 +121,10 @@ class QFL_signals(SetupSignals):
                         )
 
                     self.custom_telegram_msg(
-                        f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message} -\n lowest price: {lowest_price} -\n sd: {sd} -\n slope: {slope}",
+                        f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message}"
+                        f"-\n lowest price: {lowest_price}"
+                        f"-\n sd: {sd}"
+                        f"-\n slope: {slope}",
                         symbol=trading_pair,
                     )
 
@@ -134,34 +137,25 @@ class QFL_signals(SetupSignals):
                     except Exception:
                         return
 
-                    if slope > 0:
-                        process_autotrade_restrictions(
-                            self,
-                            trading_pair,
-                            "hodloo_qfl_signals_base-break",
-                            **{
-                                "sd": sd,
-                                "current_price": alert_price,
-                                "lowest_price": lowest_price,
-                                "trend": "uptrend"
-                            },
-                        )
-                    else:
-                        process_autotrade_restrictions(
-                            self,
-                            trading_pair,
-                            "hodloo_qfl_signals_panic",
-                            test_only=True,
-                            **{
-                                "sd": sd,
-                                "current_price": alert_price,
-                                "lowest_price": lowest_price,
-                                "trend": "downtrend",
-                            },
-                        )
+                    process_autotrade_restrictions(
+                        self,
+                        trading_pair,
+                        "hodloo_qfl_signals_panic",
+                        test_only=True,
+                        **{
+                            "sd": sd,
+                            "current_price": alert_price,
+                            "lowest_price": lowest_price,
+                            "trend": "downtrend",
+                        },
+                    )
+                        
 
                     self.custom_telegram_msg(
-                        f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message} -\n lowest price: {lowest_price}",
+                        f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message}"
+                        f"-\n lowest price: {lowest_price}"
+                        f"-\n sd: {sd}"
+                        f"-\n slope: {slope}",
                         symbol=trading_pair,
                     )
 
