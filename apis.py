@@ -183,6 +183,7 @@ class BinbotApi(BinanceApi):
     bb_symbols_raw = f"{bb_base_url}/account/symbols"
     bb_bot_url = f"{bb_base_url}/bot"
     bb_activate_bot_url = f"{bb_base_url}/bot/activate"
+    bb_gainers_losers = f"{bb_base_url}/account/gainers-losers"
 
     # Trade operations
     bb_buy_order_url = f"{bb_base_url}/order/buy"
@@ -229,6 +230,11 @@ class BinbotApi(BinanceApi):
     
     def get_blacklist(self):
         res = get(url=f'{self.bb_blacklist_url}')
+        data = handle_binance_errors(res)
+        return data
+
+    def gainers_a_losers(self):
+        res = get(url=self.bb_gainers_losers)
         data = handle_binance_errors(res)
         return data
 

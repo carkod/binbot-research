@@ -240,7 +240,7 @@ class Autotrade(BinbotApi):
                         )
                     except Exception as error:
                         print(error)
-                    self.default_bot.base_order_size = supress_notation(
+                    self.default_bot["base_order_size"] = supress_notation(
                         base_order_size, self.decimals
                     )
                     pass
@@ -262,6 +262,7 @@ class Autotrade(BinbotApi):
             "balance_to_use"
         ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
         self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
+        self.default_bot["dynamic_trailling"] = True
 
         if "sd" in kwargs and "current_price" in kwargs:
             sd = kwargs["sd"]
@@ -272,13 +273,25 @@ class Autotrade(BinbotApi):
             elif volatility > 0.06:
                 volatility = 0.06
 
-            self.default_bot["stop_loss"] = round_numbers(volatility * 100, 2)
-
         else:
             print(
                 f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
             )
             return
+    
+        if "trend" in kwargs and kwargs["trend"] == "downtrend":
+            # Temporary restriction to avoid using real money
+            if self.db_collection_name == "bots":
+                print("Margin short is still WIP, not proceeding with autotrade with real bots")
+                return
+
+            if not sd:
+                margin_short_volatility = 2.3
+            else:
+                margin_short_volatility = round_numbers((sd / float(kwargs["current_price"])) * 100, 2)
+
+            self.default_bot["strategy"] = "margin_short"
+            self.default_bot["take_profit"] = margin_short_volatility
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
@@ -286,7 +299,7 @@ class Autotrade(BinbotApi):
 
         if "error" in create_bot and create_bot["error"] == 1:
             print(
-                f"Test Autotrade: {create_bot['message']}",
+                f"Autotrade: {create_bot['message']}",
                 f"Pair: {self.pair}.",
             )
             return
@@ -368,7 +381,8 @@ def process_autotrade_restrictions(
         print(f"Not enough funds to autotrade [bots].")
         return
 
-    if int(self.settings["autotrade"]) == 1 and not test_only:
+    if (int(self.settings["autotrade"]) == 1
+        and not test_only):
         if self.reached_max_active_autobots("bots"):
             print("Reached maximum number of active bots set in controller settings")
         else:

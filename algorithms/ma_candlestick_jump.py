@@ -12,7 +12,10 @@ def ma_candlestick_jump(
     sd,
     _send_msg,
     run_autotrade,
-    lowest_price
+    lowest_price,
+    slope,
+    p_value,
+    r_value
 ):
     """
     Candlesticks are in an upward trending motion for several periods
@@ -50,12 +53,17 @@ def ma_candlestick_jump(
 - SD {sd}
 - Percentage volatility: {(sd) / float(close_price)}
 - Percentage volatility x2: {sd * 2 / float(close_price)}
+- Slope: {slope}
+- P-value: {p_value}
+- Pearson correlation: {r_value}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
         _send_msg(msg)
         print(msg)
 
-        run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price})
+        trend = "uptrend" if slope > 0 else "downtrend"
+
+        run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "uptrend"})
 
     return
