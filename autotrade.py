@@ -292,6 +292,8 @@ class Autotrade(BinbotApi):
 
             self.default_bot["strategy"] = "margin_short"
             self.default_bot["take_profit"] = margin_short_volatility
+            # Binances forces isolated pair to go through 24hr deactivation after traded
+            self.default_bot["cooldown"] = 1440
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
