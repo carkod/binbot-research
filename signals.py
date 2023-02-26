@@ -1,9 +1,9 @@
 import math
 import os
-import random
 from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
+from requests import get
 
 import numpy
 import pandas as pd
@@ -16,9 +16,12 @@ from binance import AsyncClient, BinanceSocketManager
 from scipy import stats
 from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
-
+from typing import Literal
 
 class SetupSignals(BinbotApi):
+    """
+    Tools and functions that are shared by all signals
+    """
     def __init__(self):
         self.interval = "15m"
         self.markets_streams = None
@@ -34,6 +37,9 @@ class SetupSignals(BinbotApi):
         self.blacklist_data = []
         self.test_autotrade_settings = {}
         self.settings = {}
+        # Because market domination analysis 40 weight from binance endpoints
+        self.market_domination_ts = datetime.now()
+        self.market_domination_trend = None
 
     def _send_msg(self, msg):
         """
@@ -165,13 +171,55 @@ class SetupSignals(BinbotApi):
 
         return False
 
+    def market_domination(self) -> Literal["gainers", "losers", None]:
+        """
+        Get data from gainers and losers endpoint to analyze market trends
+
+        We want to know when it's more suitable to do long positions
+        when it's more suitable to do short positions
+        For now setting threshold to 70% i.e.
+        if > 70% of assets in a given market (USDT) dominated by gainers
+        if < 70% of assets in a given market dominated by losers
+        Establish the timing
+        """
+        if datetime.now() >= self.market_domination_ts:
+                
+            res = get(url=self.bb_gainers_losers)
+            data = handle_binance_errors(res)
+            gainers = 0
+            losers = 0
+            for item in data["data"]:
+                if float(item["priceChangePercent"]) > 0:
+                    gainers += 1
+                elif float(item["priceChangePercent"]) == 0:
+                    continue
+                else:
+                    losers += 1
+
+            total = gainers + losers
+            perc_gainers = (gainers / total) * 100
+            perc_losers = (losers / total) * 100
+
+            if perc_gainers > 70:
+                self.market_domination_trend = "gainers"
+
+            if perc_losers > 70:
+                self.market_domination_trend = "losers"
+
+            print(
+                f"[{datetime.now()}] Current USDT market trend is: {self.market_domination_trend}"
+            )
+            self._send_msg(
+                f"[{datetime.now()}] Current USDT market #trend is dominated by {self.market_domination_trend}"
+            )
+            self.market_domination_ts = datetime.now() + timedelta(minutes=15)
+        return
+
 
 class ResearchSignals(SetupSignals):
     def __init__(self):
         info("Started research signals")
         self.last_processed_kline = {}
-        self.market_analyses_timestamp = datetime.now()
-        self.market_trend = None
         super().__init__()
 
     def new_tokens(self, projects) -> list:
@@ -256,43 +304,6 @@ class ResearchSignals(SetupSignals):
         else:
             await self._run_streams(stream, 1)
 
-    def market_analyses(self):
-        """
-        Use gainers and losers endpoint to analyze market trends
-
-        We want to know when it's more suitable to do long positions
-        when it's more suitable to do short positions
-        For now setting threshold to 70% i.e.
-        if > 70% of assets in a given market (USDT) are uptrend
-        if < 70% of assets in a given market are downtrend
-        Establish the timing
-        """
-        data = self.gainers_a_losers()
-        gainers = 0
-        losers = 0
-        for item in data["data"]:
-            if float(item["priceChangePercent"]) > 0:
-                gainers += 1
-            elif float(item["priceChangePercent"]) == 0:
-                continue
-            else:
-                losers += 1
-
-        total = gainers + losers
-        perc_gainers = (gainers / total) * 100
-        perc_losers = (losers / total) * 100
-
-        if perc_gainers > 70:
-            self.market_trend = "gainers"
-            return
-
-        if perc_losers > 70:
-            self.market_trend = "losers"
-            return
-
-        self.market_trend = None
-        return
-
     def process_kline_stream(self, result):
         """
         Updates market data in DB for research
@@ -345,7 +356,7 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            if self.market_trend == "gainers":
+            if self.market_domination_trend == "gainers":
                 ma_candlestick_jump(
                     self,
                     close_price,
@@ -363,7 +374,7 @@ class ResearchSignals(SetupSignals):
                     r_value=rvalue,
                 )
 
-            if self.market_trend == "losers":
+            if self.market_domination_trend == "losers":
                 ma_candlestick_drop(
                     self,
                     close_price,
@@ -381,16 +392,7 @@ class ResearchSignals(SetupSignals):
                     r_value=rvalue,
                 )
 
-            if datetime.now() >= self.market_analyses_timestamp:
-                self.market_analyses()
-                print(
-                    f"[{datetime.now()}] Current USDT market trend is: {self.market_trend}"
-                )
-                self._send_msg(
-                    f"[{datetime.now()}] Current USDT market #trend is dominated by {self.market_trend}"
-                )
-                self.market_analyses_timestamp = datetime.now() + timedelta(minutes=15)
-
+            self.market_domination()
             self.last_processed_kline[symbol] = time()
 
         # If more than 6 hours passed has passed

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from requests import Session, get
 
 from utils import handle_binance_errors
+from typing import Literal
 
 load_dotenv()
 
@@ -233,12 +234,6 @@ class BinbotApi(BinanceApi):
         data = handle_binance_errors(res)
         return data
 
-    def gainers_a_losers(self):
-        res = get(url=self.bb_gainers_losers)
-        data = handle_binance_errors(res)
-        return data
-
-
 class CBSApi:
     cbs_root_url = "https://api.cryptobasescanner.com/"
     cbs_bases = f"{cbs_root_url}/v1/bases/"
@@ -250,4 +245,4 @@ class CBSApi:
         }
         res = get(url=self.cbs_bases, params=params)
         data = handle_binance_errors(res)
-        return data
+        return 
