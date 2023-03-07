@@ -11,7 +11,6 @@ from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
 from scipy.stats import linregress
-from datetime import datetime
 
 class QFL_signals(SetupSignals):
     def __init__(self):
@@ -102,18 +101,18 @@ class QFL_signals(SetupSignals):
                     except Exception:
                         return
                     
-                    if self.market_domination_trend == "gainers":
-                        process_autotrade_restrictions(
-                            self,
-                            trading_pair,
-                            "hodloo_qfl_signals_base-break",
-                            **{
-                                "sd": sd,
-                                "current_price": alert_price,
-                                "lowest_price": lowest_price,
-                                "trend": "uptrend"
-                            },
-                        )
+                    # if self.market_domination_trend == "gainers":
+                    #     process_autotrade_restrictions(
+                    #         self,
+                    #         trading_pair,
+                    #         "hodloo_qfl_signals_base-break",
+                    #         **{
+                    #             "sd": sd,
+                    #             "current_price": alert_price,
+                    #             "lowest_price": lowest_price,
+                    #             "trend": "uptrend"
+                    #         },
+                    #     )
                     if self.market_domination_trend == "losers":
                         process_autotrade_restrictions(
                             self,
