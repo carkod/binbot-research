@@ -55,6 +55,6 @@ def ma_candlestick_drop(
         print(msg)
         trend = "uptrend" if slope > 0 else "downtrend"
 
-        run_autotrade(self, symbol, "ma_candlestick_drop", True, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
+        run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
 
     return
