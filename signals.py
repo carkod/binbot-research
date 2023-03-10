@@ -182,6 +182,7 @@ class SetupSignals(BinbotApi):
         if < 70% of assets in a given market dominated by losers
         Establish the timing
         """
+        print(f"Market domination trend: {self.market_domination_trend}")
         if datetime.now() >= self.market_domination_ts:
                 
             res = get(url=self.bb_gainers_losers)
