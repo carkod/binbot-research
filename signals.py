@@ -77,6 +77,8 @@ class SetupSignals(BinbotApi):
         blacklist_res = requests.get(url=f"{self.bb_blacklist_url}")
         blacklist_data = handle_binance_errors(blacklist_res)
 
+        self.market_domination()
+
         # Show webscket errors
         if "error" in (settings_data, blacklist_res) and (
             settings_data["error"] == 1 or blacklist_res["error"] == 1
@@ -183,7 +185,7 @@ class SetupSignals(BinbotApi):
         Establish the timing
         """
         if datetime.now() >= self.market_domination_ts:
-                
+            print(f"Performing market domination analyses: {self.market_domination_trend}")
             res = get(url=self.bb_gainers_losers)
             data = handle_binance_errors(res)
             gainers = 0
@@ -392,7 +394,7 @@ class ResearchSignals(SetupSignals):
                     r_value=rvalue,
                 )
 
-            self.market_domination()
+            
             self.last_processed_kline[symbol] = time()
 
         # If more than 6 hours passed has passed
@@ -402,4 +404,7 @@ class ResearchSignals(SetupSignals):
             and (float(time()) - float(self.last_processed_kline[symbol])) > 6000
         ):
             del self.last_processed_kline[symbol]
+
+
+        self.market_domination()
         pass

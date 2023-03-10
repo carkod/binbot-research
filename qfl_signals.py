@@ -185,6 +185,7 @@ class QFL_signals(SetupSignals):
                 and (float(time()) - float(self.last_processed_asset[asset])) > 3600
             ):
                 del self.last_processed_asset[asset]
+
         else:
             await asyncio.sleep(1)
         return

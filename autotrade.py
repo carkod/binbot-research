@@ -37,12 +37,12 @@ class Autotrade(BinbotApi):
             "mode": "autotrade",
             "balance_size_to_use": settings["balance_size_to_use"],
             "balance_to_use": settings["balance_to_use"],
-            "base_order_size": "0",
+            "base_order_size": settings["base_order_size"],
             "candlestick_interval": settings["candlestick_interval"],
             "take_profit": settings["take_profit"],
             "trailling": settings["trailling"],
             "trailling_deviation": settings["trailling_deviation"],
-            "trailling_profit": 0,  # Trailling activation (first take profit hit)
+            "trailling_profit": 0, # Trailling activation (first take profit hit)
             "orders": [],
             "stop_loss": settings["stop_loss"],
             "safety_orders": [],
@@ -76,6 +76,28 @@ class Autotrade(BinbotApi):
         res = requests.post(url=self.bb_blacklist_url, json=data)
         result = handle_binance_errors(res)
         return result
+
+    def margin_short_bots(self, kwargs):
+        """
+        Set up values for margin_short
+        this overrides the settings in research_controller autotrade settings
+        """
+
+        if "sd" not in kwargs:
+            margin_short_volatility = 2.3
+        else:
+            margin_short_volatility = round_numbers((float(kwargs["sd"]) / float(kwargs["current_price"])) * 100, 2)
+
+        # Most cryptos don't have enough with 15 USDT
+        self.default_bot["base_order_size"] = 20
+        self.default_bot["strategy"] = "margin_short"
+        # self.default_bot["base_order_size"] = float(self.default_bot["base_order_size"]) * (1 + float(self.default_bot["stop_loss"]))
+        self.default_bot["take_profit"] = 2.3
+        self.default_bot["trailling_deviation"] = 1.8
+        self.default_bot["stop_loss"] = 1.8
+        # Binances forces isolated pair to go through 24hr deactivation after traded
+        self.default_bot["cooldown"] = 1440
+        self.default_bot["margin_short_reversal"] = True
 
     def handle_price_drops(
         self,
@@ -280,20 +302,7 @@ class Autotrade(BinbotApi):
             return
     
         if "trend" in kwargs and kwargs["trend"] == "downtrend":
-            # Temporary restriction to avoid using real money
-            if self.db_collection_name == "bots":
-                print("Margin short is still WIP, not proceeding with autotrade with real bots")
-                return
-
-            if not sd:
-                margin_short_volatility = 2.3
-            else:
-                margin_short_volatility = round_numbers((sd / float(kwargs["current_price"])) * 100, 2)
-
-            self.default_bot["strategy"] = "margin_short"
-            self.default_bot["take_profit"] = margin_short_volatility
-            # Binances forces isolated pair to go through 24hr deactivation after traded
-            self.default_bot["cooldown"] = 1440
+            self.margin_short_bots(kwargs)
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
