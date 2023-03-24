@@ -84,7 +84,7 @@ class Autotrade(BinbotApi):
         """
 
         if "sd" not in kwargs:
-            margin_short_volatility = 2.3
+            margin_short_volatility = 1.8
         else:
             margin_short_volatility = round_numbers((float(kwargs["sd"]) / float(kwargs["current_price"])) * 100, 2)
 
@@ -92,9 +92,10 @@ class Autotrade(BinbotApi):
         self.default_bot["base_order_size"] = 20
         self.default_bot["strategy"] = "margin_short"
         # self.default_bot["base_order_size"] = float(self.default_bot["base_order_size"]) * (1 + float(self.default_bot["stop_loss"]))
+        self.default_bot["trailling"] = True
         self.default_bot["take_profit"] = 2.3
-        self.default_bot["trailling_deviation"] = 1.8
-        self.default_bot["stop_loss"] = 1.8
+        self.default_bot["trailling_deviation"] = margin_short_volatility
+        self.default_bot["stop_loss"] = margin_short_volatility
         # Binances forces isolated pair to go through 24hr deactivation after traded
         self.default_bot["cooldown"] = 1440
         self.default_bot["margin_short_reversal"] = True
