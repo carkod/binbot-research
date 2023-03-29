@@ -86,7 +86,7 @@ class Autotrade(BinbotApi):
         if "sd" not in kwargs:
             margin_short_volatility = 1.8
         else:
-            margin_short_volatility = round_numbers((float(kwargs["sd"]) / float(kwargs["current_price"])) * 100, 2)
+            margin_short_volatility = round_numbers((float(kwargs["sd"]) / float(kwargs["current_price"])), 2)
 
         # Most cryptos don't have enough with 15 USDT
         self.default_bot["base_order_size"] = 20
