@@ -1,9 +1,10 @@
 import math
-import os
+import json
 from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
 from requests import get
+from asyncio import wait
 
 import numpy
 import pandas as pd
@@ -12,7 +13,7 @@ from algorithms.ma_candlestick_drop import ma_candlestick_drop
 from algorithms.ma_candlestick_jump import ma_candlestick_jump
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
-from binance import AsyncClient, BinanceSocketManager
+from streaming.socket_client import SpotWebsocketStreamClient
 from scipy import stats
 from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
@@ -185,7 +186,7 @@ class SetupSignals(BinbotApi):
         Establish the timing
         """
         if datetime.now() >= self.market_domination_ts:
-            print(f"Performing market domination analyses: {self.market_domination_trend}")
+            print(f"Performing market domination analyses. Current trend: {self.market_domination_trend}")
             res = get(url=self.bb_gainers_losers)
             data = handle_binance_errors(res)
             gainers = 0
@@ -222,6 +223,7 @@ class ResearchSignals(SetupSignals):
     def __init__(self):
         info("Started research signals")
         self.last_processed_kline = {}
+        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True)
         super().__init__()
 
     def new_tokens(self, projects) -> list:
@@ -240,30 +242,21 @@ class ResearchSignals(SetupSignals):
 
         return new_pairs
 
-    async def setup_client(self):
-        client = await AsyncClient.create(
-            os.environ["BINANCE_KEY"], os.environ["BINANCE_SECRET"]
-        )
-        socket = BinanceSocketManager(client)
-        return socket
+    def on_message(self, ws, message):
+        res = json.loads(message)
 
-    async def _run_streams(self, params, index):
-        socket = await self.setup_client()
-        klines = socket.multiplex_socket(params)
-        async with klines as k:
-            while True:
-                res = await k.recv()
+        if "result" in res:
+                print(f'Subscriptions: {res["result"]}')
 
-                if "result" in res:
-                    print(f'Subscriptions: {res["result"]}')
+        if "data" in res:
+            if "e" in res["data"] and res["data"]["e"] == "kline":
+                self.process_kline_stream(res["data"])
+            else:
+                print(f'Error: {res["data"]}')
+                self.client.stop()
 
-                if "data" in res:
-                    if "e" in res["data"] and res["data"]["e"] == "kline":
-                        self.process_kline_stream(res["data"])
-                    else:
-                        print(f'Error: {res["data"]}')
-
-    async def start_stream(self):
+    def start_stream(self):
+        print("Initializing Research signals")
         self.load_data()
         raw_symbols = self.ticker_price()
         if not raw_symbols:
@@ -288,7 +281,7 @@ class ResearchSignals(SetupSignals):
 
         params = []
         for market in list_markets:
-            params.append(f"{market.lower()}@kline_{self.interval}")
+            params.append(f"{market.lower()}")
 
         total_threads = math.floor(len(list_markets) / self.max_request) + (
             1 if len(list_markets) % self.max_request > 0 else 0
@@ -302,9 +295,9 @@ class ResearchSignals(SetupSignals):
                 stream = params[(self.max_request + 1) :]
                 if index == 0:
                     stream = params[: self.max_request]
-                await self._run_streams(stream, index)
+                self.client.klines(markets=stream, interval=self.interval)
         else:
-            await self._run_streams(stream, 1)
+            self.client.klines(markets=stream, interval=self.interval)
 
     def process_kline_stream(self, result):
         """

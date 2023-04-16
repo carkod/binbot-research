@@ -11,10 +11,12 @@ from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
 from scipy.stats import linregress
+from streaming.socket_client import SpotWebsocketStreamClient
 
 class QFL_signals(SetupSignals):
     def __init__(self):
         super().__init__()
+        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True)
         self.exchanges = ["Binance"]
         self.quotes = ["USDT", "BUSD", "USD", "BTC", "ETH"]
         self.hodloo_uri = "wss://alpha2.hodloo.com/ws"
@@ -191,11 +193,11 @@ class QFL_signals(SetupSignals):
         return
 
     async def start_stream(self):
+        print("Initializing QFL signals")
         session = aiohttp.ClientSession()
         self.load_data()
         async with session.ws_connect(self.hodloo_uri) as ws:
             async for msg in ws:
                 if msg:
                     await self.on_message(msg)
-
                 pass

@@ -311,9 +311,10 @@ class Autotrade(BinbotApi):
 
             if "trend" in kwargs and kwargs["trend"] == "downtrend":
                 # self.set_margin_short_values(kwargs)
-                return
+                pass
             else:
                 self.set_bot_values(kwargs, qty)
+                pass
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
