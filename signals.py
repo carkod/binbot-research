@@ -91,7 +91,7 @@ class SetupSignals(BinbotApi):
             "update_required" not in settings_data
             or settings_data["data"]["update_required"]
         ):
-            settings_data["data"]["update_required"] = False
+            settings_data["data"]["update_required"] = time()
             research_controller_res = requests.put(
                 url=self.bb_autotrade_settings_url, json=settings_data["data"]
             )

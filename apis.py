@@ -154,7 +154,7 @@ class BinanceApi:
         symbols = self._exchange_info(symbol)
         market = symbols["symbols"][0]
         min_notional_filter = next(
-            (m for m in market["filters"] if m["filterType"] == "MIN_NOTIONAL"), None
+            (m for m in market["filters"] if m["filterType"] == "NOTIONAL"), None
         )
         min_qty = float(qty) > float(min_notional_filter["minNotional"])
         return min_qty
