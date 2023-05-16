@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
 from requests import get
-from asyncio import wait
 
 import numpy
 import pandas as pd
@@ -223,7 +222,7 @@ class ResearchSignals(SetupSignals):
     def __init__(self):
         info("Started research signals")
         self.last_processed_kline = {}
-        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True)
+        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True, on_close=self.handle_close)
         super().__init__()
 
     def new_tokens(self, projects) -> list:
@@ -241,6 +240,11 @@ class ResearchSignals(SetupSignals):
         ]
 
         return new_pairs
+
+    def handle_close(self, message):
+        print(f'Closing research signals: {message}')
+        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True, on_close=self.handle_close)
+        self.start_stream()
 
     def on_message(self, ws, message):
         res = json.loads(message)

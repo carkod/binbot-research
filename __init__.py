@@ -28,9 +28,13 @@ handler = logging.StreamHandler(sys.stdout)
 #     scheduler.start()
 #     atexit.register(lambda: scheduler.shutdown())
 
-
-rs = ResearchSignals()
-rs.start_stream()
+try:
+    rs = ResearchSignals()
+    rs.start_stream()
+except Exception as error:
+        print(error)
+        rs = ResearchSignals()
+        rs.start_stream()
 
 async def signals_main():
     qfl = QFL_signals()
@@ -43,7 +47,5 @@ if __name__ == "__main__":
         asyncio.run(signals_main())
     except Exception as error:
         print(error)
-        rs = ResearchSignals()
-        rs.start_stream()
         asyncio.run(signals_main())
 

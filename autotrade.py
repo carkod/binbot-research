@@ -291,7 +291,7 @@ class Autotrade(BinbotApi):
         balances = handle_binance_errors(res)
         qty = 0
 
-        if self.db_collection_name != "paper_trading":
+        if self.db_collection_name == "paper_trading":
             # Dynamic switch to real bot URLs
             bot_url = self.bb_test_bot_url
             activate_url = self.bb_activate_test_bot_url
@@ -300,6 +300,7 @@ class Autotrade(BinbotApi):
                 self.set_margin_short_values(kwargs)
             else:
                 self.set_paper_trading_values(balances, qty)
+                pass
             
         # Can't get balance qty, because balance = 0 if real bot is trading
         # Base order set to default 1 to avoid errors
@@ -310,10 +311,10 @@ class Autotrade(BinbotApi):
             activate_url = self.bb_activate_bot_url
 
             if "trend" in kwargs and kwargs["trend"] == "downtrend":
-                # self.set_margin_short_values(kwargs)
+                self.set_margin_short_values(kwargs)
                 pass
             else:
-                self.set_bot_values(kwargs, qty)
+                # self.set_bot_values(kwargs, qty)
                 pass
 
         # Create bot
