@@ -120,7 +120,7 @@ class QFL_signals(SetupSignals):
                             self,
                             trading_pair,
                             "hodloo_qfl_signals_base-break",
-                            test_only=True,
+                            test_only=False,
                             **{
                                 "sd": sd,
                                 "current_price": alert_price,
@@ -160,7 +160,7 @@ class QFL_signals(SetupSignals):
                             self,
                             trading_pair,
                             "hodloo_qfl_signals_panic",
-                            test_only=True,
+                            test_only=False,
                             **{
                                 "sd": sd,
                                 "current_price": alert_price,

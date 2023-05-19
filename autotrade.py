@@ -27,7 +27,7 @@ class Autotrade(BinbotApi):
         db_collection_name: Mongodb collection name ["paper_trading", "bots"]
         """
         self.pair = pair
-        self.settings = settings
+        self.settings = settings # both settings and test_settings
         self.decimals = self.price_precision(pair)
         current_date = datetime.now().strftime("%Y-%m-%dT%H:%M")
         self.default_bot = {
@@ -296,6 +296,13 @@ class Autotrade(BinbotApi):
             bot_url = self.bb_test_bot_url
             activate_url = self.bb_activate_test_bot_url
 
+            if self.settings["strategy"] == "margin_short":
+                self.set_margin_short_values(kwargs)
+                pass
+            else:
+                self.set_paper_trading_values(balances, qty)
+                pass
+                
             if "trend" in kwargs and kwargs["trend"] == "downtrend":
                 self.set_margin_short_values(kwargs)
             else:
@@ -310,12 +317,19 @@ class Autotrade(BinbotApi):
             bot_url = self.bb_bot_url
             activate_url = self.bb_activate_bot_url
 
-            if "trend" in kwargs and kwargs["trend"] == "downtrend":
+            if self.settings["strategy"] == "margin_short":
                 self.set_margin_short_values(kwargs)
                 pass
             else:
                 # self.set_bot_values(kwargs, qty)
                 pass
+
+            # if "trend" in kwargs and kwargs["trend"] == "downtrend":
+            #     self.set_margin_short_values(kwargs)
+            #     pass
+            # else:
+            #     self.set_bot_values(kwargs, qty)
+            #     pass
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
@@ -362,6 +376,7 @@ def process_autotrade_restrictions(
     2. Check if we need to update websockets
     3. Check if autotrade is enabled
     4. Check if test autotrades
+    5. Check active strategy
     """
     # Wrap in try and except to avoid bugs stopping real bot trades
     try:
