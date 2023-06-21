@@ -321,7 +321,7 @@ class Autotrade(BinbotApi):
                 self.set_margin_short_values(kwargs)
                 pass
             else:
-                self.set_bot_values(kwargs, qty)
+                # self.set_bot_values(kwargs, qty)
                 pass
 
         # Create bot
