@@ -1,5 +1,7 @@
 import math
 import json
+import logging
+
 from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
@@ -260,35 +262,19 @@ class ResearchSignals(SetupSignals):
                 self.client.stop()
 
     def start_stream(self):
-        print("Initializing Research signals")
+        logging.info("Initializing Research signals")
         self.load_data()
-        raw_symbols = self.ticker_price()
-        if not raw_symbols:
-            print("No symbols provided by ticket_price", raw_symbols)
+        exchange_info = self._exchange_info()
+        raw_symbols = set(coin["symbol"] for coin in exchange_info["symbols"] if coin["status"] == "TRADING" and coin["symbol"].endswith(self.settings["balance_to_use"]))
 
-        black_list = [x["pair"] for x in self.blacklist_data]
-        markets = set(
-            [
-                item["symbol"]
-                for item in raw_symbols
-                if item["symbol"].endswith(self.settings["balance_to_use"])
-            ]
-        )
-        subtract_list = set(black_list)
-        list_markets = markets - subtract_list
-        # Optimal setting below setting greatly reduces the websocket load
-        # To make it faster to scan and reduce chances of being blocked by Binance
-        if self.settings and self.settings["balance_to_use"] != "GBP":
-            list_markets = [
-                item for item in list_markets if self.settings["balance_to_use"] in item
-            ]
-
+        black_list = set(x["pair"] for x in self.blacklist_data)
+        market = raw_symbols - black_list
         params = []
-        for market in list_markets:
-            params.append(f"{market.lower()}")
+        for m in market:
+            params.append(f"{m.lower()}")
 
-        total_threads = math.floor(len(list_markets) / self.max_request) + (
-            1 if len(list_markets) % self.max_request > 0 else 0
+        total_threads = math.floor(len(market) / self.max_request) + (
+            1 if len(market) % self.max_request > 0 else 0
         )
         # It's not possible to have websockets with more 950 pairs
         # So set default to max 950
@@ -355,23 +341,23 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            if self.market_domination_trend == "gainers":
-                ma_candlestick_jump(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope=slope,
-                    p_value=pvalue,
-                    r_value=rvalue,
-                )
+            # if self.market_domination_trend == "gainers":
+            ma_candlestick_jump(
+                self,
+                close_price,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                slope=slope,
+                p_value=pvalue,
+                r_value=rvalue,
+            )
 
             if self.market_domination_trend == "losers":
                 ma_candlestick_drop(
