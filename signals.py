@@ -252,7 +252,7 @@ class ResearchSignals(SetupSignals):
         res = json.loads(message)
 
         if "result" in res:
-                print(f'Subscriptions: {res["result"]}')
+            print(f'Subscriptions: {res["result"]}')
 
         if "data" in res:
             if "e" in res["data"] and res["data"]["e"] == "kline":

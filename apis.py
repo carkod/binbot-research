@@ -21,7 +21,6 @@ class BinanceApi:
 
     api_servers = ["https://api.binance.com", "https://api3.binance.com"]
     BASE = api_servers[randrange(3) - 1]
-    WAPI = f"{BASE}/api/v3/depth"
     WS_BASE = "wss://stream.binance.com:9443/stream?streams="
 
     recvWindow = 5000
@@ -117,6 +116,14 @@ class BinanceApi:
         response = handle_binance_errors(r)
         return response
 
+    def balance_estimate(self) -> float:
+        r = get(url=self.bb_balance_estimate_url)
+        response = handle_binance_errors(r)
+        for balance in response["data"]["balances"]:
+            if balance["asset"] == "USDT":
+                return float(balance["free"])
+        return 0
+
     def launchpool_projects(self):
         res = get(url=self.launchpool_url, headers={"User-Agent": "Mozilla"})
         data = handle_binance_errors(res)
@@ -170,6 +177,7 @@ class BinanceApi:
         if quote_asset:
             quote_asset = quote_asset["quoteAsset"]
         return quote_asset
+
 
 
 class BinbotApi(BinanceApi):

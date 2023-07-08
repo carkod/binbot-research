@@ -1,11 +1,15 @@
 import copy
 import math
-from datetime import datetime
+import logging
 import requests
+
+from datetime import datetime
 from apis import BinbotApi
 from utils import InvalidSymbol, handle_binance_errors, round_numbers, supress_notation
 
 class AutotradeError(Exception):
+    def __init__(self, message) -> None:
+        self.message = message
     pass
 
 
@@ -306,6 +310,16 @@ class Autotrade(BinbotApi):
             activate_url = self.bb_activate_bot_url
 
             if self.settings["strategy"] == "margin_short":
+                ticker = self.ticker_price(self.default_bot["pair"])
+                initial_price = ticker["price"]
+                estimate_qty = float(self.default_bot["base_order_size"]) / float(initial_price)
+                stop_loss_price_inc = (float(initial_price) * (1 + (self.default_bot["stop_loss"] / 100)))
+                # transfer quantity required to cover losses
+                transfer_qty = stop_loss_price_inc * estimate_qty
+                balances = self.balance_estimate()
+                if balances < transfer_qty:
+                    logging.error(f"Not enough funds to autotrade margin_short bot. Unable to cover potential losses. balances: {balances}. transfer qty: {transfer_qty}")
+                    return
                 self.set_margin_short_values(kwargs)
                 pass
             else:
@@ -328,19 +342,6 @@ class Autotrade(BinbotApi):
         print(f"Trying to activate {self.db_collection_name}...")
         res = requests.get(url=f"{activate_url}/{botId}")
         bot = handle_binance_errors(res)
-
-        # if "error" in bot and bot["error"] == 1:
-        #     msg = f"Error activating bot {self.pair} with id {botId}"
-        #     print(msg)
-        #     print(bot)
-        #     # Delete inactivatable bot
-        #     payload = {
-        #         "id": botId,
-        #     }
-        #     delete_res = requests.delete(url=bot_url, params=payload)
-        #     data = handle_binance_errors(delete_res)
-        #     print("Error trying to delete autotrade activation bot", data)
-        #     return
 
         print(
             f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
@@ -380,32 +381,11 @@ def process_autotrade_restrictions(
         pass
 
     # Check balance to avoid failed autotrades
-    check_balance_res = requests.get(url=self.bb_balance_estimate_url)
-    balances = handle_binance_errors(check_balance_res)
-    if "error" in balances and balances["error"] == 1:
-        print(balances["message"])
-        return
-
-    balance_check = float(
-        next(
-            (
-                item["free"]
-                for item in balances["data"]["balances"]
-                if item["asset"] == self.settings["balance_to_use"]
-            ),
-            0,
-        )
-    )
-
+    balance_check = self.balance_estimate()
     if balance_check < float(self.settings['base_order_size']):
         print(f"Not enough funds to autotrade [bots].")
         return
 
-    # margin_short balance check
-    min_base_order = float(self.settings['base_order_size']) * (1 + (float(self.settings['stop_loss']) / 100))
-    if balance_check < min_base_order:
-        print(f"Not enough funds to autotrade margin_short [bots].")
-        return
 
     if (int(self.settings["autotrade"]) == 1
         and not test_only):
