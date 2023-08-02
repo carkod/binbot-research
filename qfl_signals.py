@@ -11,11 +11,12 @@ from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
 from scipy.stats import linregress
-
+from streaming.socket_client import SpotWebsocketStreamClient
 
 class QFL_signals(SetupSignals):
     def __init__(self):
         super().__init__()
+        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True)
         self.exchanges = ["Binance"]
         self.quotes = ["USDT", "BUSD", "USD", "BTC", "ETH"]
         self.hodloo_uri = "wss://alpha2.hodloo.com/ws"
@@ -61,6 +62,7 @@ class QFL_signals(SetupSignals):
 
     async def on_message(self, payload):
         response = payload.json()
+        print(f"Market domination trend: {self.market_domination_trend}")
         if response["type"] in ["base-break", "panic"]:
             exchange_str, pair = response["marketInfo"]["ticker"].split(":")
             is_leveraged_token = bool(re.search("UP/", pair)) or bool(
@@ -88,30 +90,37 @@ class QFL_signals(SetupSignals):
                 trading_pair = asset + "USDT"
 
                 if response["type"] == "base-break":
-                    message = f"\nAlert Price: {alert_price}\n- Base Price:{response['basePrice']} \n- Volume: {volume24}\n- <a href='{hodloo_url}'>Hodloo</a> \n- Running autotrade"
+                    message = (
+                        f"\nAlert Price: {alert_price}"
+                        f"\n- Base Price:{response['basePrice']}"
+                        f"\n- Volume: {volume24}"
+                        f"\n- <a href='{hodloo_url}'>Hodloo</a>"
+                        "\n- Running autotrade"
+                    )
+
                     try:
                         sd, lowest_price, slope = self.get_stats(trading_pair)
                     except Exception:
                         return
                     
-                    if slope > 0:
+                    # if self.market_domination_trend == "gainers":
+                    #     process_autotrade_restrictions(
+                    #         self,
+                    #         trading_pair,
+                    #         "hodloo_qfl_signals_base-break",
+                    #         **{
+                    #             "sd": sd,
+                    #             "current_price": alert_price,
+                    #             "lowest_price": lowest_price,
+                    #             "trend": "uptrend"
+                    #         },
+                    #     )
+                    if self.market_domination_trend == "losers":
                         process_autotrade_restrictions(
                             self,
                             trading_pair,
                             "hodloo_qfl_signals_base-break",
-                            **{
-                                "sd": sd,
-                                "current_price": alert_price,
-                                "lowest_price": lowest_price,
-                                "trend": "uptrend"
-                            },
-                        )
-                    else:
-                        process_autotrade_restrictions(
-                            self,
-                            trading_pair,
-                            "hodloo_qfl_signals_base-break",
-                            test_only=True,
+                            test_only=False,
                             **{
                                 "sd": sd,
                                 "current_price": alert_price,
@@ -124,38 +133,49 @@ class QFL_signals(SetupSignals):
                         f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message}"
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
-                        f"-\n slope: {slope}",
+                        f"-\n slope: {slope}"
+                        f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )
 
                 # Uncomment when short_buy strategy is ready
                 if response["type"] == "panic":
                     strength = response["strength"]
-                    message = f'\nAlert Price: {alert_price}, Volume: {volume24}, Strength: {strength}\n- <a href="{hodloo_url}">Hodloo</a>'
+                    message = (
+                        f'\nAlert Price: {alert_price}, '
+                        f'Volume: {volume24}, Strength: {strength}'
+                        f'\n- <a href="{hodloo_url}">Hodloo</a>'
+                    )
+
                     try:
                         sd, lowest_price, slope = self.get_stats(trading_pair)
                     except Exception:
                         return
 
-                    process_autotrade_restrictions(
-                        self,
-                        trading_pair,
-                        "hodloo_qfl_signals_panic",
-                        test_only=True,
-                        **{
-                            "sd": sd,
-                            "current_price": alert_price,
-                            "lowest_price": lowest_price,
-                            "trend": "downtrend",
-                        },
-                    )
+                    # From trial and fail, it seems market_domination is a better
+                    # measure than slope i.e. when most assets are going down
+                    # panic is likely going down
+                    if self.market_domination_trend == "losers":
+                        process_autotrade_restrictions(
+                            self,
+                            trading_pair,
+                            "hodloo_qfl_signals_panic",
+                            test_only=False,
+                            **{
+                                "sd": sd,
+                                "current_price": alert_price,
+                                "lowest_price": lowest_price,
+                                "trend": "downtrend",
+                            },
+                        )
                         
 
                     self.custom_telegram_msg(
                         f"[{response['type']}] {'Below ' + str(response['belowBasePct']) + '%' + message if 'belowBasePct' in response else message}"
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
-                        f"-\n slope: {slope}",
+                        f"-\n slope: {slope}"
+                        f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )
 
@@ -167,16 +187,17 @@ class QFL_signals(SetupSignals):
                 and (float(time()) - float(self.last_processed_asset[asset])) > 3600
             ):
                 del self.last_processed_asset[asset]
+
         else:
             await asyncio.sleep(1)
         return
 
     async def start_stream(self):
+        print("Initializing QFL signals")
         session = aiohttp.ClientSession()
         self.load_data()
         async with session.ws_connect(self.hodloo_uri) as ws:
             async for msg in ws:
                 if msg:
                     await self.on_message(msg)
-
                 pass

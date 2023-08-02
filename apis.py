@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from requests import Session, get
 
 from utils import handle_binance_errors
+from typing import Literal
 
 load_dotenv()
 
@@ -20,7 +21,6 @@ class BinanceApi:
 
     api_servers = ["https://api.binance.com", "https://api3.binance.com"]
     BASE = api_servers[randrange(3) - 1]
-    WAPI = f"{BASE}/api/v3/depth"
     WS_BASE = "wss://stream.binance.com:9443/stream?streams="
 
     recvWindow = 5000
@@ -116,6 +116,14 @@ class BinanceApi:
         response = handle_binance_errors(r)
         return response
 
+    def balance_estimate(self) -> float:
+        r = get(url=self.bb_balance_estimate_url)
+        response = handle_binance_errors(r)
+        for balance in response["data"]["balances"]:
+            if balance["asset"] == "USDT":
+                return float(balance["free"])
+        return 0
+
     def launchpool_projects(self):
         res = get(url=self.launchpool_url, headers={"User-Agent": "Mozilla"})
         data = handle_binance_errors(res)
@@ -153,7 +161,7 @@ class BinanceApi:
         symbols = self._exchange_info(symbol)
         market = symbols["symbols"][0]
         min_notional_filter = next(
-            (m for m in market["filters"] if m["filterType"] == "MIN_NOTIONAL"), None
+            (m for m in market["filters"] if m["filterType"] == "NOTIONAL"), None
         )
         min_qty = float(qty) > float(min_notional_filter["minNotional"])
         return min_qty
@@ -169,6 +177,7 @@ class BinanceApi:
         if quote_asset:
             quote_asset = quote_asset["quoteAsset"]
         return quote_asset
+
 
 
 class BinbotApi(BinanceApi):
@@ -233,12 +242,6 @@ class BinbotApi(BinanceApi):
         data = handle_binance_errors(res)
         return data
 
-    def gainers_a_losers(self):
-        res = get(url=self.bb_gainers_losers)
-        data = handle_binance_errors(res)
-        return data
-
-
 class CBSApi:
     cbs_root_url = "https://api.cryptobasescanner.com/"
     cbs_bases = f"{cbs_root_url}/v1/bases/"
@@ -250,4 +253,4 @@ class CBSApi:
         }
         res = get(url=self.cbs_bases, params=params)
         data = handle_binance_errors(res)
-        return data
+        return 

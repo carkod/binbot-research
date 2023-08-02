@@ -1,9 +1,11 @@
 import math
-import os
-import random
+import json
+import logging
+
 from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
+from requests import get
 
 import numpy
 import pandas as pd
@@ -12,13 +14,16 @@ from algorithms.ma_candlestick_drop import ma_candlestick_drop
 from algorithms.ma_candlestick_jump import ma_candlestick_jump
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
-from binance import AsyncClient, BinanceSocketManager
+from streaming.socket_client import SpotWebsocketStreamClient
 from scipy import stats
 from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
-
+from typing import Literal
 
 class SetupSignals(BinbotApi):
+    """
+    Tools and functions that are shared by all signals
+    """
     def __init__(self):
         self.interval = "15m"
         self.markets_streams = None
@@ -34,6 +39,9 @@ class SetupSignals(BinbotApi):
         self.blacklist_data = []
         self.test_autotrade_settings = {}
         self.settings = {}
+        # Because market domination analysis 40 weight from binance endpoints
+        self.market_domination_ts = datetime.now()
+        self.market_domination_trend = None
 
     def _send_msg(self, msg):
         """
@@ -71,6 +79,8 @@ class SetupSignals(BinbotApi):
         blacklist_res = requests.get(url=f"{self.bb_blacklist_url}")
         blacklist_data = handle_binance_errors(blacklist_res)
 
+        self.market_domination()
+
         # Show webscket errors
         if "error" in (settings_data, blacklist_res) and (
             settings_data["error"] == 1 or blacklist_res["error"] == 1
@@ -82,7 +92,7 @@ class SetupSignals(BinbotApi):
             "update_required" not in settings_data
             or settings_data["data"]["update_required"]
         ):
-            settings_data["data"]["update_required"] = False
+            settings_data["data"]["update_required"] = time()
             research_controller_res = requests.put(
                 url=self.bb_autotrade_settings_url, json=settings_data["data"]
             )
@@ -165,13 +175,56 @@ class SetupSignals(BinbotApi):
 
         return False
 
+    def market_domination(self) -> Literal["gainers", "losers", None]:
+        """
+        Get data from gainers and losers endpoint to analyze market trends
+
+        We want to know when it's more suitable to do long positions
+        when it's more suitable to do short positions
+        For now setting threshold to 70% i.e.
+        if > 70% of assets in a given market (USDT) dominated by gainers
+        if < 70% of assets in a given market dominated by losers
+        Establish the timing
+        """
+        if datetime.now() >= self.market_domination_ts:
+            print(f"Performing market domination analyses. Current trend: {self.market_domination_trend}")
+            res = get(url=self.bb_gainers_losers)
+            data = handle_binance_errors(res)
+            gainers = 0
+            losers = 0
+            for item in data["data"]:
+                if float(item["priceChangePercent"]) > 0:
+                    gainers += 1
+                elif float(item["priceChangePercent"]) == 0:
+                    continue
+                else:
+                    losers += 1
+
+            total = gainers + losers
+            perc_gainers = (gainers / total) * 100
+            perc_losers = (losers / total) * 100
+
+            if perc_gainers > 70:
+                self.market_domination_trend = "gainers"
+
+            if perc_losers > 70:
+                self.market_domination_trend = "losers"
+
+            print(
+                f"[{datetime.now()}] Current USDT market trend is: {self.market_domination_trend}"
+            )
+            self._send_msg(
+                f"[{datetime.now()}] Current USDT market #trend is dominated by {self.market_domination_trend}"
+            )
+            self.market_domination_ts = datetime.now() + timedelta(minutes=15)
+        return
+
 
 class ResearchSignals(SetupSignals):
     def __init__(self):
         info("Started research signals")
         self.last_processed_kline = {}
-        self.market_analyses_timestamp = datetime.now()
-        self.market_trend = None
+        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True, on_close=self.handle_close)
         super().__init__()
 
     def new_tokens(self, projects) -> list:
@@ -190,58 +243,38 @@ class ResearchSignals(SetupSignals):
 
         return new_pairs
 
-    async def setup_client(self):
-        client = await AsyncClient.create(
-            os.environ["BINANCE_KEY"], os.environ["BINANCE_SECRET"]
-        )
-        socket = BinanceSocketManager(client)
-        return socket
+    def handle_close(self, message):
+        print(f'Closing research signals: {message}')
+        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True, on_close=self.handle_close)
+        self.start_stream()
 
-    async def _run_streams(self, params, index):
-        socket = await self.setup_client()
-        klines = socket.multiplex_socket(params)
-        async with klines as k:
-            while True:
-                res = await k.recv()
+    def on_message(self, ws, message):
+        res = json.loads(message)
 
-                if "result" in res:
-                    print(f'Subscriptions: {res["result"]}')
+        if "result" in res:
+            print(f'Subscriptions: {res["result"]}')
 
-                if "data" in res:
-                    if "e" in res["data"] and res["data"]["e"] == "kline":
-                        self.process_kline_stream(res["data"])
-                    else:
-                        print(f'Error: {res["data"]}')
+        if "data" in res:
+            if "e" in res["data"] and res["data"]["e"] == "kline":
+                self.process_kline_stream(res["data"])
+            else:
+                print(f'Error: {res["data"]}')
+                self.client.stop()
 
-    async def start_stream(self):
+    def start_stream(self):
+        logging.info("Initializing Research signals")
         self.load_data()
-        raw_symbols = self.ticker_price()
-        if not raw_symbols:
-            print("No symbols provided by ticket_price", raw_symbols)
+        exchange_info = self._exchange_info()
+        raw_symbols = set(coin["symbol"] for coin in exchange_info["symbols"] if coin["status"] == "TRADING" and coin["symbol"].endswith(self.settings["balance_to_use"]))
 
-        black_list = [x["pair"] for x in self.blacklist_data]
-        markets = set(
-            [
-                item["symbol"]
-                for item in raw_symbols
-                if item["symbol"].endswith(self.settings["balance_to_use"])
-            ]
-        )
-        subtract_list = set(black_list)
-        list_markets = markets - subtract_list
-        # Optimal setting below setting greatly reduces the websocket load
-        # To make it faster to scan and reduce chances of being blocked by Binance
-        if self.settings and self.settings["balance_to_use"] != "GBP":
-            list_markets = [
-                item for item in list_markets if self.settings["balance_to_use"] in item
-            ]
-
+        black_list = set(x["pair"] for x in self.blacklist_data)
+        market = raw_symbols - black_list
         params = []
-        for market in list_markets:
-            params.append(f"{market.lower()}@kline_{self.interval}")
+        for m in market:
+            params.append(f"{m.lower()}")
 
-        total_threads = math.floor(len(list_markets) / self.max_request) + (
-            1 if len(list_markets) % self.max_request > 0 else 0
+        total_threads = math.floor(len(market) / self.max_request) + (
+            1 if len(market) % self.max_request > 0 else 0
         )
         # It's not possible to have websockets with more 950 pairs
         # So set default to max 950
@@ -252,46 +285,9 @@ class ResearchSignals(SetupSignals):
                 stream = params[(self.max_request + 1) :]
                 if index == 0:
                     stream = params[: self.max_request]
-                await self._run_streams(stream, index)
+                self.client.klines(markets=stream, interval=self.interval)
         else:
-            await self._run_streams(stream, 1)
-
-    def market_analyses(self):
-        """
-        Use gainers and losers endpoint to analyze market trends
-
-        We want to know when it's more suitable to do long positions
-        when it's more suitable to do short positions
-        For now setting threshold to 70% i.e.
-        if > 70% of assets in a given market (USDT) are uptrend
-        if < 70% of assets in a given market are downtrend
-        Establish the timing
-        """
-        data = self.gainers_a_losers()
-        gainers = 0
-        losers = 0
-        for item in data["data"]:
-            if float(item["priceChangePercent"]) > 0:
-                gainers += 1
-            elif float(item["priceChangePercent"]) == 0:
-                continue
-            else:
-                losers += 1
-
-        total = gainers + losers
-        perc_gainers = (gainers / total) * 100
-        perc_losers = (losers / total) * 100
-
-        if perc_gainers > 70:
-            self.market_trend = "gainers"
-            return
-
-        if perc_losers > 70:
-            self.market_trend = "losers"
-            return
-
-        self.market_trend = None
-        return
+            self.client.klines(markets=stream, interval=self.interval)
 
     def process_kline_stream(self, result):
         """
@@ -345,25 +341,25 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            if self.market_trend == "gainers":
-                ma_candlestick_jump(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope=slope,
-                    p_value=pvalue,
-                    r_value=rvalue,
-                )
+            # if self.market_domination_trend == "gainers":
+            ma_candlestick_jump(
+                self,
+                close_price,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                slope=slope,
+                p_value=pvalue,
+                r_value=rvalue,
+            )
 
-            if self.market_trend == "losers":
+            if self.market_domination_trend == "losers":
                 ma_candlestick_drop(
                     self,
                     close_price,
@@ -381,16 +377,7 @@ class ResearchSignals(SetupSignals):
                     r_value=rvalue,
                 )
 
-            if datetime.now() >= self.market_analyses_timestamp:
-                self.market_analyses()
-                print(
-                    f"[{datetime.now()}] Current USDT market trend is: {self.market_trend}"
-                )
-                self._send_msg(
-                    f"[{datetime.now()}] Current USDT market #trend is dominated by {self.market_trend}"
-                )
-                self.market_analyses_timestamp = datetime.now() + timedelta(minutes=15)
-
+            
             self.last_processed_kline[symbol] = time()
 
         # If more than 6 hours passed has passed
@@ -400,4 +387,7 @@ class ResearchSignals(SetupSignals):
             and (float(time()) - float(self.last_processed_kline[symbol])) > 6000
         ):
             del self.last_processed_kline[symbol]
+
+
+        self.market_domination()
         pass

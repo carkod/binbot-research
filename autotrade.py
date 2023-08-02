@@ -1,11 +1,15 @@
 import copy
 import math
-from datetime import datetime
+import logging
 import requests
+
+from datetime import datetime
 from apis import BinbotApi
 from utils import InvalidSymbol, handle_binance_errors, round_numbers, supress_notation
 
 class AutotradeError(Exception):
+    def __init__(self, message) -> None:
+        self.message = message
     pass
 
 
@@ -27,7 +31,7 @@ class Autotrade(BinbotApi):
         db_collection_name: Mongodb collection name ["paper_trading", "bots"]
         """
         self.pair = pair
-        self.settings = settings
+        self.settings = settings # both settings and test_settings
         self.decimals = self.price_precision(pair)
         current_date = datetime.now().strftime("%Y-%m-%dT%H:%M")
         self.default_bot = {
@@ -37,12 +41,12 @@ class Autotrade(BinbotApi):
             "mode": "autotrade",
             "balance_size_to_use": settings["balance_size_to_use"],
             "balance_to_use": settings["balance_to_use"],
-            "base_order_size": "0",
+            "base_order_size": settings["base_order_size"],
             "candlestick_interval": settings["candlestick_interval"],
             "take_profit": settings["take_profit"],
             "trailling": settings["trailling"],
             "trailling_deviation": settings["trailling_deviation"],
-            "trailling_profit": 0,  # Trailling activation (first take profit hit)
+            "trailling_profit": 0, # Trailling activation (first take profit hit)
             "orders": [],
             "stop_loss": settings["stop_loss"],
             "safety_orders": [],
@@ -76,6 +80,26 @@ class Autotrade(BinbotApi):
         res = requests.post(url=self.bb_blacklist_url, json=data)
         result = handle_binance_errors(res)
         return result
+
+    def set_margin_short_values(self, kwargs):
+        """
+        Set up values for margin_short
+        this overrides the settings in research_controller autotrade settings
+        """
+
+        if "sd" not in kwargs:
+            margin_short_volatility = 1.8
+        else:
+            margin_short_volatility = round_numbers((float(kwargs["sd"]) / float(kwargs["current_price"])), 2) * 100
+
+        # Most cryptos don't have enough with 15 USDT
+        self.default_bot["strategy"] = "margin_short"
+        # self.default_bot["base_order_size"] = float(self.default_bot["base_order_size"]) * (1 + float(self.default_bot["stop_loss"]))
+        self.default_bot["trailling"] = True
+        self.default_bot["trailling_deviation"] = margin_short_volatility
+        # Binances forces isolated pair to go through 24hr deactivation after traded
+        self.default_bot["cooldown"] = 1440
+        self.default_bot["margin_short_reversal"] = True
 
     def handle_price_drops(
         self,
@@ -166,6 +190,85 @@ class Autotrade(BinbotApi):
                     }
                 )
         return
+    
+    def set_bot_values(self, kwargs, qty):
+        """
+        Set values for default_bot
+        """
+        self.default_bot["base_order_size"] = self.settings["base_order_size"]
+        self.default_bot[
+            "balance_to_use"
+        ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
+        self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
+        self.default_bot["dynamic_trailling"] = True
+
+        if "sd" in kwargs and "current_price" in kwargs:
+            sd = kwargs["sd"]
+            self.default_bot["sd"] = sd
+            volatility = (sd / 2) / float(kwargs["current_price"])
+            if volatility < 0.018:
+                volatility = 0.018
+            elif volatility > 0.06:
+                volatility = 0.06
+    
+    def set_paper_trading_values(self, balances, qty):
+
+        self.default_bot["base_order_size"] = "15"  # min USDT order = 15
+        # Get balance that match the pair
+        # Check that we have minimum binance required qty to trade
+        for b in balances["data"]:
+            if self.pair.endswith(b["asset"]):
+                qty = supress_notation(b["free"], self.decimals)
+                if self.min_amount_check(self.pair, qty):
+                    # balance_size_to_use = 0.0 means "Use all balance". float(0) = 0.0
+                    if float(self.default_bot["balance_size_to_use"]) != 0.0:
+                        if b["free"] < float(
+                            self.default_bot["balance_size_to_use"]
+                        ):
+                            # Display warning and continue with full balance
+                            print(
+                                f"Error: balance ({qty}) is less than balance_size_to_use ({float(self.default_bot['balance_size_to_use'])}). Autotrade will use all balance"
+                            )
+                        else:
+                            qty = float(self.default_bot["balance_size_to_use"])
+
+                    self.default_bot["base_order_size"] = qty
+                    break
+            # If we have GBP we can trade anything
+            # And we have roughly the min BTC equivalent amount
+            if (
+                self.settings["balance_to_use"] == "GBP"
+                and b["asset"] == "GBP"
+                # Trading with less than 40 GBP will not be profitable
+                and float(b["free"]) > 40
+            ):
+                base_asset = self.find_quoteAsset(self.pair)
+                # e.g. XRPBTC
+                if base_asset == "GBP":
+                    self.default_bot["base_order_size"] = b["free"]
+                    break
+                try:
+                    rate = self.ticker_price(f"{base_asset}GBP")
+                except InvalidSymbol:
+                    msg = f"Cannot trade {self.pair} with GBP. Adding to blacklist"
+                    self.handle_error(msg)
+                    self.add_to_blacklist(self.pair, msg)
+                    print(msg)
+                    return
+
+                rate = rate["price"]
+                qty = supress_notation(b["free"], self.decimals)
+                # Round down to 6 numbers to avoid not enough funds
+                try:
+                    base_order_size = (
+                        math.floor((float(qty) / float(rate)) * 10000000) / 10000000
+                    )
+                except Exception as error:
+                    print(error)
+                self.default_bot["base_order_size"] = supress_notation(
+                    base_order_size, self.decimals
+                )
+                pass
 
     def activate_autotrade(self, **kwargs):
         """
@@ -185,113 +288,43 @@ class Autotrade(BinbotApi):
         res = requests.get(url=self.bb_balance_url)
         balances = handle_binance_errors(res)
         qty = 0
-        bot_url = self.bb_test_bot_url
-        activate_url = self.bb_activate_test_bot_url
 
-        if self.db_collection_name != "paper_trading":
-            # Get balance that match the pair
-            # Check that we have minimum binance required qty to trade
-            for b in balances["data"]:
-                if self.pair.endswith(b["asset"]):
-                    qty = supress_notation(b["free"], self.decimals)
-                    if self.min_amount_check(self.pair, qty):
-                        # balance_size_to_use = 0.0 means "Use all balance". float(0) = 0.0
-                        if float(self.default_bot["balance_size_to_use"]) != 0.0:
-                            if b["free"] < float(
-                                self.default_bot["balance_size_to_use"]
-                            ):
-                                # Display warning and continue with full balance
-                                print(
-                                    f"Error: balance ({qty}) is less than balance_size_to_use ({float(self.default_bot['balance_size_to_use'])}). Autotrade will use all balance"
-                                )
-                            else:
-                                qty = float(self.default_bot["balance_size_to_use"])
-
-                        self.default_bot["base_order_size"] = qty
-                        break
-                # If we have GBP we can trade anything
-                # And we have roughly the min BTC equivalent amount
-                if (
-                    self.settings["balance_to_use"] == "GBP"
-                    and b["asset"] == "GBP"
-                    # Trading with less than 40 GBP will not be profitable
-                    and float(b["free"]) > 40
-                ):
-                    base_asset = self.find_quoteAsset(self.pair)
-                    # e.g. XRPBTC
-                    if base_asset == "GBP":
-                        self.default_bot["base_order_size"] = b["free"]
-                        break
-                    try:
-                        rate = self.ticker_price(f"{base_asset}GBP")
-                    except InvalidSymbol:
-                        msg = f"Cannot trade {self.pair} with GBP. Adding to blacklist"
-                        self.handle_error(msg)
-                        self.add_to_blacklist(self.pair, msg)
-                        print(msg)
-                        return
-
-                    rate = rate["price"]
-                    qty = supress_notation(b["free"], self.decimals)
-                    # Round down to 6 numbers to avoid not enough funds
-                    try:
-                        base_order_size = (
-                            math.floor((float(qty) / float(rate)) * 10000000) / 10000000
-                        )
-                    except Exception as error:
-                        print(error)
-                    self.default_bot["base_order_size"] = supress_notation(
-                        base_order_size, self.decimals
-                    )
-                    pass
-
+        if self.db_collection_name == "paper_trading":
             # Dynamic switch to real bot URLs
-            bot_url = self.bb_bot_url
-            activate_url = self.bb_activate_bot_url
+            bot_url = self.bb_test_bot_url
+            activate_url = self.bb_activate_test_bot_url
 
+            if self.settings["strategy"] == "margin_short":
+                self.set_margin_short_values(kwargs)
+                pass
+            else:
+                self.set_paper_trading_values(balances, qty)
+                pass
+            
         # Can't get balance qty, because balance = 0 if real bot is trading
         # Base order set to default 1 to avoid errors
         # and because there is no matching engine endpoint to get market qty
         # So deal base_order should update this to the correct amount
         if self.db_collection_name == "bots":
-            self.default_bot["base_order_size"] = self.settings["base_order_size"]
-        else:
-            self.default_bot["base_order_size"] = "15"  # min USDT order = 15
+            bot_url = self.bb_bot_url
+            activate_url = self.bb_activate_bot_url
 
-        self.default_bot[
-            "balance_to_use"
-        ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
-        self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
-        self.default_bot["dynamic_trailling"] = True
-
-        if "sd" in kwargs and "current_price" in kwargs:
-            sd = kwargs["sd"]
-            self.default_bot["sd"] = sd
-            volatility = (sd / 2) / float(kwargs["current_price"])
-            if volatility < 0.018:
-                volatility = 0.018
-            elif volatility > 0.06:
-                volatility = 0.06
-
-        else:
-            print(
-                f"Succesful {self.db_collection_name} autotrade, opened with {self.pair} (using sd)!"
-            )
-            return
-    
-        if "trend" in kwargs and kwargs["trend"] == "downtrend":
-            # Temporary restriction to avoid using real money
-            if self.db_collection_name == "bots":
-                print("Margin short is still WIP, not proceeding with autotrade with real bots")
-                return
-
-            if not sd:
-                margin_short_volatility = 2.3
+            if self.settings["strategy"] == "margin_short":
+                ticker = self.ticker_price(self.default_bot["pair"])
+                initial_price = ticker["price"]
+                estimate_qty = float(self.default_bot["base_order_size"]) / float(initial_price)
+                stop_loss_price_inc = (float(initial_price) * (1 + (self.default_bot["stop_loss"] / 100)))
+                # transfer quantity required to cover losses
+                transfer_qty = stop_loss_price_inc * estimate_qty
+                balances = self.balance_estimate()
+                if balances < transfer_qty:
+                    logging.error(f"Not enough funds to autotrade margin_short bot. Unable to cover potential losses. balances: {balances}. transfer qty: {transfer_qty}")
+                    return
+                self.set_margin_short_values(kwargs)
+                pass
             else:
-                margin_short_volatility = round_numbers((sd / float(kwargs["current_price"])) * 100, 2)
-
-            self.default_bot["strategy"] = "margin_short"
-            self.default_bot["take_profit"] = margin_short_volatility
+                self.set_bot_values(kwargs, qty)
+                pass
 
         # Create bot
         create_bot_res = requests.post(url=bot_url, json=self.default_bot)
@@ -310,19 +343,6 @@ class Autotrade(BinbotApi):
         res = requests.get(url=f"{activate_url}/{botId}")
         bot = handle_binance_errors(res)
 
-        if "error" in bot and bot["error"] == 1:
-            msg = f"Error activating bot {self.pair} with id {botId}"
-            print(msg)
-            print(bot)
-            # Delete inactivatable bot
-            payload = {
-                "id": botId,
-            }
-            delete_res = requests.delete(url=bot_url, params=payload)
-            data = handle_binance_errors(delete_res)
-            print("Error trying to delete autotrade activation bot", data)
-            return
-
         print(
             f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
         )
@@ -338,6 +358,7 @@ def process_autotrade_restrictions(
     2. Check if we need to update websockets
     3. Check if autotrade is enabled
     4. Check if test autotrades
+    5. Check active strategy
     """
     # Wrap in try and except to avoid bugs stopping real bot trades
     try:
@@ -360,26 +381,11 @@ def process_autotrade_restrictions(
         pass
 
     # Check balance to avoid failed autotrades
-    check_balance_res = requests.get(url=self.bb_balance_estimate_url)
-    balances = handle_binance_errors(check_balance_res)
-    if "error" in balances and balances["error"] == 1:
-        print(balances["message"])
-        return
-
-    balance_check = float(
-        next(
-            (
-                item["free"]
-                for item in balances["data"]["balances"]
-                if item["asset"] == self.settings["balance_to_use"]
-            ),
-            0,
-        )
-    )
-
+    balance_check = self.balance_estimate()
     if balance_check < float(self.settings['base_order_size']):
         print(f"Not enough funds to autotrade [bots].")
         return
+
 
     if (int(self.settings["autotrade"]) == 1
         and not test_only):
