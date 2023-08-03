@@ -12,6 +12,8 @@ import pandas as pd
 import requests
 from algorithms.ma_candlestick_drop import ma_candlestick_drop
 from algorithms.ma_candlestick_jump import ma_candlestick_jump
+from algorithms.rally import rally_or_pullback
+from algorithms.price_changes import price_rise_15
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
 from streaming.socket_client import SpotWebsocketStreamClient
@@ -339,6 +341,31 @@ class ResearchSignals(SetupSignals):
             # historical lowest for short_buy_price
             lowest_price = numpy.min(
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
+            )
+
+
+            rally_or_pullback(
+                self,
+                close_price,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                p_value=pvalue,
+                r_value=rvalue,
+            )
+
+            price_rise_15(
+                self,
+                close_price,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                data["trace"][0]["close"][-2],
+                p_value=pvalue,
+                r_value=rvalue,
             )
 
             # if self.market_domination_trend == "gainers":

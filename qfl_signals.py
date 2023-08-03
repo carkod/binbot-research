@@ -62,7 +62,6 @@ class QFL_signals(SetupSignals):
 
     async def on_message(self, payload):
         response = payload.json()
-        print(f"Market domination trend: {self.market_domination_trend}")
         if response["type"] in ["base-break", "panic"]:
             exchange_str, pair = response["marketInfo"]["ticker"].split(":")
             is_leveraged_token = bool(re.search("UP/", pair)) or bool(
@@ -152,22 +151,18 @@ class QFL_signals(SetupSignals):
                     except Exception:
                         return
 
-                    # From trial and fail, it seems market_domination is a better
-                    # measure than slope i.e. when most assets are going down
-                    # panic is likely going down
-                    if self.market_domination_trend == "losers":
-                        process_autotrade_restrictions(
-                            self,
-                            trading_pair,
-                            "hodloo_qfl_signals_panic",
-                            test_only=False,
-                            **{
-                                "sd": sd,
-                                "current_price": alert_price,
-                                "lowest_price": lowest_price,
-                                "trend": "downtrend",
-                            },
-                        )
+                    process_autotrade_restrictions(
+                        self,
+                        trading_pair,
+                        "hodloo_qfl_signals_panic",
+                        test_only=False,
+                        **{
+                            "sd": sd,
+                            "current_price": alert_price,
+                            "lowest_price": lowest_price,
+                            "trend": "downtrend",
+                        },
+                    )
                         
 
                     self.custom_telegram_msg(
