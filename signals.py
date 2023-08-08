@@ -336,7 +336,7 @@ class ResearchSignals(SetupSignals):
             # Average amplitude
             msg = None
             list_prices = numpy.array(data["trace"][0]["close"])
-            sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
+            sd = round_numbers(numpy.std(list_prices.astype(numpy.single)), 4)
 
             # historical lowest for short_buy_price
             lowest_price = numpy.min(
