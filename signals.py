@@ -343,18 +343,18 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-
-            rally_or_pullback(
-                self,
-                close_price,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                p_value=pvalue,
-                r_value=rvalue,
-            )
+            if self.market_domination_trend == "losers":
+                rally_or_pullback(
+                    self,
+                    close_price,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    p_value=pvalue,
+                    r_value=rvalue,
+                )
 
             price_rise_15(
                 self,
