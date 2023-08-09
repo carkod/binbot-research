@@ -12,7 +12,12 @@ def rally_or_pullback(
     run_autotrade,
     lowest_price,
     p_value,
-    r_value
+    r_value,
+    open_price,
+    ma_7,
+    ma_100,
+    ma_25,
+    slope
 ):
     """
     Rally algorithm
@@ -58,6 +63,18 @@ def rally_or_pullback(
     # trend = "uptrend" if slope > 0 else "downtrend"
 
     if algo_type == "Pullback":
-        run_autotrade(self, symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
+
+        if (
+            float(close_price) > float(open_price)
+            and sd > 0.09
+            and close_price < ma_25[len(ma_25) - 1]
+            and close_price < ma_25[len(ma_25) - 2]
+            and close_price < ma_25[len(ma_25) - 3]
+            and close_price < ma_100[len(ma_100) - 1]
+            and close_price < ma_100[len(ma_100) - 2]
+            and close_price < ma_100[len(ma_100) - 3]
+        ):
+
+            run_autotrade(self, symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
 
     return

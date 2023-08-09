@@ -96,7 +96,6 @@ class Autotrade(BinbotApi):
         self.default_bot["strategy"] = "margin_short"
         # self.default_bot["base_order_size"] = float(self.default_bot["base_order_size"]) * (1 + float(self.default_bot["stop_loss"]))
         self.default_bot["trailling"] = True
-        self.default_bot["trailling_deviation"] = margin_short_volatility
         # Binances forces isolated pair to go through 24hr deactivation after traded
         self.default_bot["cooldown"] = 1440
         self.default_bot["margin_short_reversal"] = True

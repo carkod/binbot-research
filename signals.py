@@ -343,7 +343,7 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            if self.market_domination_trend == "losers":
+            if self.market_domination_trend:
                 rally_or_pullback(
                     self,
                     close_price,
@@ -352,8 +352,13 @@ class ResearchSignals(SetupSignals):
                     self._send_msg,
                     process_autotrade_restrictions,
                     lowest_price,
-                    p_value=pvalue,
-                    r_value=rvalue,
+                    pvalue,
+                    rvalue,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    slope
                 )
 
             price_rise_15(
@@ -369,22 +374,22 @@ class ResearchSignals(SetupSignals):
             )
 
             # if self.market_domination_trend == "gainers":
-            ma_candlestick_jump(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope=slope,
-                p_value=pvalue,
-                r_value=rvalue,
-            )
+            # ma_candlestick_jump(
+            #     self,
+            #     close_price,
+            #     open_price,
+            #     ma_7,
+            #     ma_100,
+            #     ma_25,
+            #     symbol,
+            #     sd,
+            #     self._send_msg,
+            #     process_autotrade_restrictions,
+            #     lowest_price,
+            #     slope=slope,
+            #     p_value=pvalue,
+            #     r_value=rvalue,
+            # )
 
             if self.market_domination_trend == "losers":
                 ma_candlestick_drop(
