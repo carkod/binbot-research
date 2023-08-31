@@ -343,6 +343,9 @@ class ResearchSignals(SetupSignals):
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
+            # COIN/BTC correlation: closer to 1 strong
+            btc_correlation = data["btc_correlation"]
+
             if self.market_domination_trend:
                 rally_or_pullback(
                     self,
@@ -353,12 +356,12 @@ class ResearchSignals(SetupSignals):
                     process_autotrade_restrictions,
                     lowest_price,
                     pvalue,
-                    rvalue,
                     open_price,
                     ma_7,
                     ma_100,
                     ma_25,
-                    slope
+                    slope,
+                    btc_correlation
                 )
 
             price_rise_15(
@@ -371,27 +374,27 @@ class ResearchSignals(SetupSignals):
                 data["trace"][0]["close"][-2],
                 p_value=pvalue,
                 r_value=rvalue,
+                btc_correlation=btc_correlation
             )
 
-            # if self.market_domination_trend == "gainers":
-            # ma_candlestick_jump(
-            #     self,
-            #     close_price,
-            #     open_price,
-            #     ma_7,
-            #     ma_100,
-            #     ma_25,
-            #     symbol,
-            #     sd,
-            #     self._send_msg,
-            #     process_autotrade_restrictions,
-            #     lowest_price,
-            #     slope=slope,
-            #     p_value=pvalue,
-            #     r_value=rvalue,
-            # )
-
             if self.market_domination_trend == "losers":
+                ma_candlestick_jump(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope=slope,
+                    p_value=pvalue,
+                    btc_correlation=btc_correlation,
+                )
+
                 ma_candlestick_drop(
                     self,
                     close_price,
@@ -406,7 +409,7 @@ class ResearchSignals(SetupSignals):
                     lowest_price,
                     slope=slope,
                     p_value=pvalue,
-                    r_value=rvalue,
+                    btc_correlation=btc_correlation
                 )
 
             

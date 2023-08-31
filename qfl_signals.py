@@ -58,7 +58,7 @@ class QFL_signals(SetupSignals):
         )
         dates = numpy.array(data["trace"][0]["x"])
         slope, intercept, rvalue, pvalue, stderr = linregress(dates, list_prices)
-        return sd, lowest_price, slope
+        return sd, lowest_price, slope, data["btc_correlation"]
 
     async def on_message(self, payload):
         response = payload.json()
@@ -88,20 +88,22 @@ class QFL_signals(SetupSignals):
                 # Because signals for other market could influence also USDT market
                 trading_pair = asset + "USDT"
 
+                try:
+                    sd, lowest_price, slope, btc_correlation = self.get_stats(trading_pair)
+                except Exception:
+                    return
+                
+
                 if response["type"] == "base-break":
                     message = (
                         f"\nAlert Price: {alert_price}"
                         f"\n- Base Price:{response['basePrice']}"
                         f"\n- Volume: {volume24}"
+                        f"\n- Correlation with BTC: {btc_correlation}"
                         f"\n- <a href='{hodloo_url}'>Hodloo</a>"
                         "\n- Running autotrade"
                     )
 
-                    try:
-                        sd, lowest_price, slope = self.get_stats(trading_pair)
-                    except Exception:
-                        return
-                    
                     # if self.market_domination_trend == "gainers":
                     #     process_autotrade_restrictions(
                     #         self,
@@ -133,6 +135,7 @@ class QFL_signals(SetupSignals):
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
                         f"-\n slope: {slope}"
+                        f"\n- Correlation with BTC: {btc_correlation}"
                         f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )
@@ -170,6 +173,7 @@ class QFL_signals(SetupSignals):
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
                         f"-\n slope: {slope}"
+                        f"\n- Correlation with BTC: {btc_correlation}"
                         f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )

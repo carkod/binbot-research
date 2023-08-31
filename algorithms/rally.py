@@ -12,12 +12,12 @@ def rally_or_pullback(
     run_autotrade,
     lowest_price,
     p_value,
-    r_value,
     open_price,
     ma_7,
     ma_100,
     ma_25,
-    slope
+    slope,
+    btc_correlation
 ):
     """
     Rally algorithm
@@ -55,7 +55,7 @@ def rally_or_pullback(
 - Percentage volatility: {(sd) / float(close_price)}
 - Percentage volatility x2: {sd * 2 / float(close_price)}
 - P-value: {p_value}
-- Pearson correlation: {r_value}
+- Pearson correlation with BTC: {btc_correlation}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
