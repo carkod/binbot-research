@@ -49,6 +49,11 @@ def rally_or_pullback(
     if not algo_type:
         return
 
+    if self.market_domination_trend == "losers":
+        trend = "downtrend"
+    else:
+        trend = "uptrend"
+    
     msg = (f"""
 - [{os.getenv('ENV')}] <strong>{algo_type} #algorithm</strong> #{symbol}
 - Current price: {close_price}
@@ -56,11 +61,13 @@ def rally_or_pullback(
 - Percentage volatility x2: {sd * 2 / float(close_price)}
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation}
+- Market domination: {trend}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
     _send_msg(msg)
-    # trend = "uptrend" if slope > 0 else "downtrend"
+
+    
 
     if algo_type == "Pullback":
 
@@ -75,6 +82,6 @@ def rally_or_pullback(
             and close_price < ma_100[len(ma_100) - 3]
         ):
 
-            run_autotrade(self, symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
+            run_autotrade(self, symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
 
     return

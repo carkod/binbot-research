@@ -346,23 +346,22 @@ class ResearchSignals(SetupSignals):
             # COIN/BTC correlation: closer to 1 strong
             btc_correlation = data["btc_correlation"]
 
-            if self.market_domination_trend:
-                rally_or_pullback(
-                    self,
-                    close_price,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    pvalue,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    slope,
-                    btc_correlation
-                )
+            rally_or_pullback(
+                self,
+                close_price,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                pvalue,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                slope,
+                btc_correlation
+            )
 
             price_rise_15(
                 self,
@@ -378,6 +377,7 @@ class ResearchSignals(SetupSignals):
             )
 
             if self.market_domination_trend == "losers":
+                
                 ma_candlestick_jump(
                     self,
                     close_price,
