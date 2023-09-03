@@ -34,6 +34,7 @@ class Autotrade(BinbotApi):
         self.settings = settings # both settings and test_settings
         self.decimals = self.price_precision(pair)
         current_date = datetime.now().strftime("%Y-%m-%dT%H:%M")
+        self.algorithm_name = algorithm_name
         self.default_bot = {
             "pair": pair,
             "status": "inactive",
@@ -99,6 +100,11 @@ class Autotrade(BinbotApi):
         # Binances forces isolated pair to go through 24hr deactivation after traded
         self.default_bot["cooldown"] = 1440
         self.default_bot["margin_short_reversal"] = True
+
+        # Override for top_gainers_drop
+        if self.algorithm_name == "top_gainers_drop":
+            self.default_bot["stop_loss"] = 5
+            self.default_bot["trailling_deviation"] = 3.2
 
     def handle_price_drops(
         self,
