@@ -95,14 +95,14 @@ class QFL_signals(SetupSignals):
                 
 
                 if response["type"] == "base-break":
-                    message = (
-                        f"\nAlert Price: {alert_price}"
-                        f"\n- Base Price:{response['basePrice']}"
-                        f"\n- Volume: {volume24}"
-                        f"\n- Correlation with BTC: {btc_correlation}"
-                        f"\n- <a href='{hodloo_url}'>Hodloo</a>"
-                        "\n- Running autotrade"
-                    )
+                    message = (f"""
+                        \nAlert Price: {alert_price}
+                        \n- Base Price:{response['basePrice']}
+                        \n- Volume: {volume24}"
+                        \n- Correlation with BTC: {btc_correlation['close_price']}
+                        \n- <a href='{hodloo_url}'>Hodloo</a>"
+                        \n- Running autotrade
+                    """)
 
                     # if self.market_domination_trend == "gainers":
                     #     process_autotrade_restrictions(
@@ -135,7 +135,7 @@ class QFL_signals(SetupSignals):
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
                         f"-\n slope: {slope}"
-                        f"\n- Correlation with BTC: {btc_correlation}"
+                        f"\n- Correlation with BTC: {btc_correlation['close_price']}"
                         f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )
@@ -173,7 +173,7 @@ class QFL_signals(SetupSignals):
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
                         f"-\n slope: {slope}"
-                        f"\n- Correlation with BTC: {btc_correlation}"
+                        f"\n- Correlation with BTC: {btc_correlation['close_price']}"
                         f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )
