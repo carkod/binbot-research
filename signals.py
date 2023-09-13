@@ -15,6 +15,7 @@ from algorithms.ma_candlestick_jump import ma_candlestick_jump
 from algorithms.rally import rally_or_pullback
 from algorithms.price_changes import price_rise_15
 from algorithms.top_gainer_drop import top_gainers_drop
+from api.account.routes import ticker
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
 from streaming.socket_client import SpotWebsocketStreamClient
@@ -47,6 +48,8 @@ class SetupSignals(BinbotApi):
         self.market_domination_trend = None
         self.top_coins_gainers = []
 
+        self.btc_change_perc = 0
+
     def _send_msg(self, msg):
         """
         Send message with telegram bot
@@ -65,6 +68,22 @@ class SetupSignals(BinbotApi):
         )
         result = handle_binance_errors(res)
         return result
+
+    def ticker_24(self, symbol: str | None = None):
+        """
+        Weight 40 without symbol
+        https://github.com/carkod/binbot/issues/438
+
+        Using cache
+        """
+        url = self.ticker24_url
+        params = {
+            "symbol":  symbol
+        }
+        
+        res = requests.get(url=url, params=params)
+        data = handle_binance_errors(res)
+        return data
 
     def load_data(self):
         """
@@ -128,6 +147,11 @@ class SetupSignals(BinbotApi):
         )
         paper_trading_bots = handle_binance_errors(paper_trading_bots_res)
         self.active_test_bots = [item["pair"] for item in paper_trading_bots["data"]]
+
+
+        # Get 24hr last BTCUSDT
+        btc_ticker_24 = self.ticker_24("BTCUSDT")
+        self.btc_change_perc = float(btc_ticker_24['priceChangePercent'])
 
         self.market_domination()
         pass
@@ -292,10 +316,7 @@ class ResearchSignals(SetupSignals):
         # It's not possible to have websockets with more 950 pairs
         # So set default to max 950
         stream = params[:950]
-
-        for s in stream:
-            if s == "UNIUSDT":
-                print("UNISDT is in the signals stream")
+        params.append("BTCUSDT")
 
         if total_threads > 1 or not self.max_request:
             for index in range(total_threads - 1):
@@ -410,40 +431,42 @@ class ResearchSignals(SetupSignals):
                     slope,
                     btc_correlation
                 )
-                
-                ma_candlestick_jump(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope=slope,
-                    p_value=pvalue,
-                    btc_correlation=btc_correlation,
-                )
 
-                # ma_candlestick_drop(
-                #     self,
-                #     close_price,
-                #     open_price,
-                #     ma_7,
-                #     ma_100,
-                #     ma_25,
-                #     symbol,
-                #     sd,
-                #     self._send_msg,
-                #     process_autotrade_restrictions,
-                #     lowest_price,
-                #     slope=slope,
-                #     p_value=pvalue,
-                #     btc_correlation=btc_correlation
-                # )
+                if self.btc_change_perc > 0:
+                
+                    ma_candlestick_jump(
+                        self,
+                        close_price,
+                        open_price,
+                        ma_7,
+                        ma_100,
+                        ma_25,
+                        symbol,
+                        sd,
+                        self._send_msg,
+                        process_autotrade_restrictions,
+                        lowest_price,
+                        slope=slope,
+                        p_value=pvalue,
+                        btc_correlation=btc_correlation,
+                    )
+                else:
+                    ma_candlestick_drop(
+                        self,
+                        close_price,
+                        open_price,
+                        ma_7,
+                        ma_100,
+                        ma_25,
+                        symbol,
+                        sd,
+                        self._send_msg,
+                        process_autotrade_restrictions,
+                        lowest_price,
+                        slope=slope,
+                        p_value=pvalue,
+                        btc_correlation=btc_correlation
+                    )
 
             
             self.last_processed_kline[symbol] = time()
