@@ -1,5 +1,7 @@
 import os
 
+from utils import define_strategy
+
 
 def ma_candlestick_drop(
     self,
@@ -15,7 +17,7 @@ def ma_candlestick_drop(
     lowest_price,
     slope,
     p_value,
-    btc_correlation
+    btc_correlation,
 ):
     """
     Opposite algorithm of ma_candletick_jump
@@ -38,6 +40,8 @@ def ma_candlestick_drop(
         # remove high standard deviation
         and float(sd) / float(close_price) < 0.07
     ):
+        
+        trend = define_strategy(self.btc_change_perc, btc_correlation)
 
         msg = (f"""
 - [{os.getenv('ENV')}] Candlestick <strong>#drop algorithm</strong> #{symbol}
@@ -48,13 +52,13 @@ def ma_candlestick_drop(
 - Slope: {slope}
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
+- BTC 24hr change: {self.btc_change_perc}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
         _send_msg(msg)
         print(msg)
-        trend = "uptrend" if slope > 0 else "downtrend"
 
-        run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "uptrend"})
+        run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
 
     return

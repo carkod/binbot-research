@@ -61,13 +61,12 @@ def rally_or_pullback(
 - Percentage volatility x2: {sd * 2 / float(close_price)}
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
+- BTC 24hr change: {self.btc_change_perc}
 - Market domination: {trend}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
     _send_msg(msg)
-
-    
 
     if algo_type == "Pullback":
 
