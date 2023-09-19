@@ -26,6 +26,7 @@ def top_gainers_drop(
         float(close_price) < float(open_price)
         and btc_correlation["close_price"] < 0.5
         and symbol in self.top_coins_gainers
+        and self.btc_change_perc < 0
     ):
 
         msg = (f"""

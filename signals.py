@@ -428,22 +428,21 @@ class ResearchSignals(SetupSignals):
                     btc_correlation=btc_correlation,
                 )
 
-            if self.market_domination_trend == "losers":
-                top_gainers_drop(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope,
-                    btc_correlation,
-                )
+            top_gainers_drop(
+                self,
+                close_price,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                slope,
+                btc_correlation,
+            )
 
             ma_candlestick_jump(
                 self,
