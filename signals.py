@@ -256,9 +256,6 @@ class SetupSignals(BinbotApi):
             print(
                 f"[{datetime.now()}] Current USDT market trend is: {self.market_domination_trend}. BTC 24hr change: {self.btc_change_perc}"
             )
-            self._send_msg(
-                f"[{datetime.now()}] Current USDT market #trend is dominated by {self.market_domination_trend}. BTC 24hr change: {self.btc_change_perc}"
-            )
             self.market_domination_ts = datetime.now() + timedelta(minutes=15)
         return
 
@@ -268,7 +265,7 @@ class ResearchSignals(SetupSignals):
         info("Started research signals")
         self.last_processed_kline = {}
         self.client = SpotWebsocketStreamClient(
-            on_message=self.on_message, is_combined=True, on_close=self.handle_close
+            on_message=self.on_message, on_close=self.handle_close
         )
         super().__init__()
 
@@ -322,8 +319,17 @@ class ResearchSignals(SetupSignals):
         black_list = set(x["pair"] for x in self.blacklist_data)
         market = raw_symbols - black_list
         params = []
+        subscription_list = []
         for m in market:
             params.append(f"{m.lower()}")
+            subscription_list.append({
+                "_id": m,
+                "pair": m,
+                "blacklisted": False,
+            })
+
+        # update DB
+        self.update_subscribed_list(subscription_list)
 
         total_threads = math.floor(len(market) / self.max_request) + (
             1 if len(market) % self.max_request > 0 else 0
@@ -398,23 +404,40 @@ class ResearchSignals(SetupSignals):
             btc_correlation = data["btc_correlation"]
 
             if self.market_domination_trend == "gainers":
-                rally_or_pullback(
+                top_gainers_drop(
                     self,
                     close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
                     symbol,
                     sd,
                     self._send_msg,
                     process_autotrade_restrictions,
                     lowest_price,
-                    pvalue,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
                     slope,
                     btc_correlation,
                 )
 
+            rally_or_pullback(
+                self,
+                close_price,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                pvalue,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                slope,
+                btc_correlation,
+            )
+
+            if self.market_domination_trend == "gainers":
                 price_rise_15(
                     self,
                     close_price,
@@ -427,22 +450,6 @@ class ResearchSignals(SetupSignals):
                     r_value=rvalue,
                     btc_correlation=btc_correlation,
                 )
-
-            top_gainers_drop(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope,
-                btc_correlation,
-            )
 
             ma_candlestick_jump(
                 self,

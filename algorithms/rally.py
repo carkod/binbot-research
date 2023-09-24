@@ -1,6 +1,6 @@
 import os
 import requests
-from utils import handle_binance_errors
+from utils import handle_binance_errors, define_strategy
 
 
 def rally_or_pullback(
@@ -49,10 +49,9 @@ def rally_or_pullback(
     if not algo_type:
         return
 
-    if self.market_domination_trend == "losers":
-        trend = "downtrend"
-    else:
-        trend = "uptrend"
+    trend = define_strategy(self.btc_change_perc, btc_correlation)
+    if not trend:
+        return
     
     msg = (f"""
 - [{os.getenv('ENV')}] <strong>{algo_type} #algorithm</strong> #{symbol}

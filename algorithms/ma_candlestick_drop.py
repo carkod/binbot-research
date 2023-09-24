@@ -42,6 +42,8 @@ def ma_candlestick_drop(
     ):
         
         trend = define_strategy(self.btc_change_perc, btc_correlation)
+        if not trend:
+            return
 
         msg = (f"""
 - [{os.getenv('ENV')}] Candlestick <strong>#drop algorithm</strong> #{symbol}
