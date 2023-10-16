@@ -298,12 +298,8 @@ class ResearchSignals(SetupSignals):
         if "result" in res:
             print(f'Subscriptions: {res["result"]}')
 
-        if "data" in res:
-            if "e" in res["data"] and res["data"]["e"] == "kline":
-                self.process_kline_stream(res["data"])
-            else:
-                print(f'Error: {res["data"]}')
-                self.client.stop()
+        if "e" in res and res["e"] == "kline":
+            self.process_kline_stream(res)
 
     def start_stream(self):
         logging.info("Initializing Research signals")
