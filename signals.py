@@ -286,7 +286,7 @@ class ResearchSignals(SetupSignals):
         return new_pairs
 
     def handle_close(self, message):
-        print(f"Closing research signals: {message}")
+        logging.error(f"Closing research signals: {message}")
         self.client = SpotWebsocketStreamClient(
             on_message=self.on_message, is_combined=True, on_close=self.handle_close
         )
