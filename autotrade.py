@@ -64,7 +64,7 @@ class Autotrade(BinbotApi):
     
     def handle_error(self, msg):
         """
-        Check balance to decide balance_to_use
+        Submit errors to event logs of the bot
         """
         try:
             self.settings["system_logs"].append(msg)
@@ -75,6 +75,10 @@ class Autotrade(BinbotApi):
         res = requests.put(url=self.bb_autotrade_settings_url, json=self.settings)
         result = handle_binance_errors(res)
         return result
+
+    def submit_bot_event_logs(self, bot_id, message):
+        res = requests.post(url=f"{self.bb_submit_errors}", params={"bot_id": bot_id}, json=message)
+        return res
 
     def add_to_blacklist(self, symbol, reason=None):
         data = {"symbol": symbol, "reason": reason}
@@ -344,13 +348,15 @@ class Autotrade(BinbotApi):
 
         # Activate bot
         botId = create_bot["botId"]
-        print(f"Trying to activate {self.db_collection_name}...")
         res = requests.get(url=f"{activate_url}/{botId}")
-        bot = handle_binance_errors(res)
+        bot = res.json()
 
-        print(
-            f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
-        )
+        if "error" in bot and bot["error"] > 0:
+            message = bot["message"]
+        else:
+            message = f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
+
+        self.submit_bot_event_logs(botId, message)
         pass
 
 def process_autotrade_restrictions(

@@ -205,6 +205,7 @@ class BinbotApi(BinanceApi):
     bb_close_order_url = f"{bb_base_url}/order/close"
     bb_stop_buy_order_url = f"{bb_base_url}/order/buy/stop-limit"
     bb_stop_sell_order_url = f"{bb_base_url}/order/sell/stop-limit"
+    bb_submit_errors = f"{bb_base_url}/bot/errors"
 
     # balances
     bb_balance_url = f"{bb_base_url}/account/balance/raw"

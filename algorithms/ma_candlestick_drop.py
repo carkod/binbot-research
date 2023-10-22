@@ -39,6 +39,8 @@ def ma_candlestick_drop(
         and open_price < ma_100[len(ma_100) - 1]
         # remove high standard deviation
         and float(sd) / float(close_price) < 0.07
+        # big candles. too many signals with little profitability
+        and (abs(float(close_price) - float(open_price)) / float(close_price)) > 0.02
     ):
         
         trend = define_strategy(self.btc_change_perc, btc_correlation)
