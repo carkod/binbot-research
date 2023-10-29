@@ -15,6 +15,7 @@ from algorithms.ma_candlestick_jump import ma_candlestick_jump
 from algorithms.rally import rally_or_pullback
 from algorithms.price_changes import price_rise_15
 from algorithms.top_gainer_drop import top_gainers_drop
+from algorithms.coinrule import fast_and_slow_macd
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
 from streaming.socket_client import SpotWebsocketStreamClient
@@ -381,6 +382,9 @@ class ResearchSignals(SetupSignals):
             ma_25 = data["trace"][2]["y"]
             ma_7 = data["trace"][3]["y"]
 
+            macd = data["macd"]
+            macd_signal = data["macd_signal"]
+
             if len(ma_100) == 0:
                 msg = f"Not enough ma_100 data: {symbol}"
                 print(msg)
@@ -415,6 +419,18 @@ class ResearchSignals(SetupSignals):
                     slope,
                     btc_correlation,
                 )
+
+            fast_and_slow_macd(
+                self,
+                close_price,
+                symbol,
+                macd,
+                macd_signal,
+                ma_7,
+                ma_25,
+                self._send_msg,
+                process_autotrade_restrictions,
+            )
 
             rally_or_pullback(
                 self,

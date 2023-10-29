@@ -91,11 +91,11 @@ def define_strategy(btc_change, btc_correlation):
     elif btc_change < 0 and correlation > 0.6:
         trend = "downtrend"
     # Weak correlation with BTC, go opposite
-    elif btc_change > 0 and correlation < 0.3:
+    elif btc_change > 0 and correlation < 0.1:
         trend = "downtrend"
-    elif btc_change < 0 and correlation < 0.3:
+    elif btc_change < 0 and correlation < 0.1:
         trend = "uptrend"
     else:
         trend = None
-    
+
     return trend
