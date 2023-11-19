@@ -297,20 +297,20 @@ class Autotrade(BinbotApi):
         res = requests.get(url=self.bb_balance_url)
         balances = handle_binance_errors(res)
         qty = 0
-        strategy = self.settings["strategy"]
+        self.default_bot["strategy"] = self.settings["strategy"]
 
         if "trend" in kwargs:
             if kwargs["trend"] == "downtrend":
-                strategy = "margin_short"
+                self.default_bot["strategy"] = "margin_short"
             else:
-                strategy = "long"
+                self.default_bot["strategy"] = "long"
 
         if self.db_collection_name == "paper_trading":
             # Dynamic switch to real bot URLs
             bot_url = self.bb_test_bot_url
             activate_url = self.bb_activate_test_bot_url
 
-            if strategy == "margin_short":
+            if self.default_bot["strategy"] == "margin_short":
                 self.set_margin_short_values(kwargs)
                 pass
             else:
@@ -325,7 +325,7 @@ class Autotrade(BinbotApi):
             bot_url = self.bb_bot_url
             activate_url = self.bb_activate_bot_url
 
-            if strategy == "margin_short":
+            if self.default_bot["strategy"] == "margin_short":
                 ticker = self.ticker_price(self.default_bot["pair"])
                 initial_price = ticker["price"]
                 estimate_qty = float(self.default_bot["base_order_size"]) / float(initial_price)

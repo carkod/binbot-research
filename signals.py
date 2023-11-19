@@ -420,17 +420,17 @@ class ResearchSignals(SetupSignals):
                     btc_correlation,
                 )
 
-            fast_and_slow_macd(
-                self,
-                close_price,
-                symbol,
-                macd,
-                macd_signal,
-                ma_7,
-                ma_25,
-                self._send_msg,
-                process_autotrade_restrictions,
-            )
+                fast_and_slow_macd(
+                    self,
+                    close_price,
+                    symbol,
+                    macd,
+                    macd_signal,
+                    ma_7,
+                    ma_25,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                )
 
             rally_or_pullback(
                 self,
