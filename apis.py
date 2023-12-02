@@ -6,7 +6,7 @@ from random import randrange
 from urllib.parse import urlencode
 
 from dotenv import load_dotenv
-from requests import Session, get
+from requests import Session, get, post
 
 from utils import handle_binance_errors
 from typing import Literal
@@ -205,6 +205,7 @@ class BinbotApi(BinanceApi):
     bb_close_order_url = f"{bb_base_url}/order/close"
     bb_stop_buy_order_url = f"{bb_base_url}/order/buy/stop-limit"
     bb_stop_sell_order_url = f"{bb_base_url}/order/sell/stop-limit"
+    bb_submit_errors = f"{bb_base_url}/bot/errors"
 
     # balances
     bb_balance_url = f"{bb_base_url}/account/balance/raw"
@@ -214,6 +215,7 @@ class BinbotApi(BinanceApi):
     # research
     bb_autotrade_settings_url = f"{bb_base_url}/autotrade-settings/bots"
     bb_blacklist_url = f"{bb_base_url}/research/blacklist"
+    bb_subscribed_list = f"{bb_base_url}/research/subscribed"
 
     # paper trading
     bb_test_bot_url = f"{bb_base_url}/paper-trading"
@@ -239,6 +241,11 @@ class BinbotApi(BinanceApi):
     
     def get_blacklist(self):
         res = get(url=f'{self.bb_blacklist_url}')
+        data = handle_binance_errors(res)
+        return data
+
+    def update_subscribed_list(self, data):
+        res = post(url=f'{self.bb_subscribed_list}', json=data)
         data = handle_binance_errors(res)
         return data
 

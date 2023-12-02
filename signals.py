@@ -12,6 +12,10 @@ import pandas as pd
 import requests
 from algorithms.ma_candlestick_drop import ma_candlestick_drop
 from algorithms.ma_candlestick_jump import ma_candlestick_jump
+from algorithms.rally import rally_or_pullback
+from algorithms.price_changes import price_rise_15
+from algorithms.top_gainer_drop import top_gainers_drop
+from algorithms.coinrule import fast_and_slow_macd, buy_low_sell_high
 from apis import BinbotApi
 from autotrade import process_autotrade_restrictions
 from streaming.socket_client import SpotWebsocketStreamClient
@@ -20,10 +24,12 @@ from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
 from typing import Literal
 
+
 class SetupSignals(BinbotApi):
     """
     Tools and functions that are shared by all signals
     """
+
     def __init__(self):
         self.interval = "15m"
         self.markets_streams = None
@@ -42,6 +48,9 @@ class SetupSignals(BinbotApi):
         # Because market domination analysis 40 weight from binance endpoints
         self.market_domination_ts = datetime.now()
         self.market_domination_trend = None
+        self.top_coins_gainers = []
+
+        self.btc_change_perc = 0
 
     def _send_msg(self, msg):
         """
@@ -62,6 +71,26 @@ class SetupSignals(BinbotApi):
         result = handle_binance_errors(res)
         return result
 
+    def ticker_24(self, symbol: str | None = None):
+        """
+        Weight 40 without symbol
+        https://github.com/carkod/binbot/issues/438
+
+        Using cache
+        """
+        url = self.ticker24_url
+        params = {"symbol": symbol}
+
+        res = requests.get(url=url, params=params)
+        data = handle_binance_errors(res)
+        return data
+
+    def get_latest_btc_price(self):
+        # Get 24hr last BTCUSDT
+        btc_ticker_24 = self.ticker_24("BTCUSDT")
+        self.btc_change_perc = float(btc_ticker_24["priceChangePercent"])
+        return self.btc_change_perc
+
     def load_data(self):
         """
         Load controller data
@@ -78,8 +107,6 @@ class SetupSignals(BinbotApi):
         settings_data = handle_binance_errors(settings_res)
         blacklist_res = requests.get(url=f"{self.bb_blacklist_url}")
         blacklist_data = handle_binance_errors(blacklist_res)
-
-        self.market_domination()
 
         # Show webscket errors
         if "error" in (settings_data, blacklist_res) and (
@@ -126,6 +153,8 @@ class SetupSignals(BinbotApi):
         )
         paper_trading_bots = handle_binance_errors(paper_trading_bots_res)
         self.active_test_bots = [item["pair"] for item in paper_trading_bots["data"]]
+
+        self.market_domination()
         pass
 
     def post_error(self, msg):
@@ -187,7 +216,9 @@ class SetupSignals(BinbotApi):
         Establish the timing
         """
         if datetime.now() >= self.market_domination_ts:
-            print(f"Performing market domination analyses. Current trend: {self.market_domination_trend}")
+            print(
+                f"Performing market domination analyses. Current trend: {self.market_domination_trend}"
+            )
             res = get(url=self.bb_gainers_losers)
             data = handle_binance_errors(res)
             gainers = 0
@@ -200,6 +231,17 @@ class SetupSignals(BinbotApi):
                 else:
                     losers += 1
 
+            # Load constraints for top_gainers_drop algo
+            available_bots = self.settings["max_active_autotrade_bots"] - len(
+                self.active_symbols
+            )
+            if available_bots > 0:
+                for i, coin in enumerate(data["data"]):
+                    if i <= available_bots:
+                        self.top_coins_gainers.append(coin["symbol"])
+                    else:
+                        break
+
             total = gainers + losers
             perc_gainers = (gainers / total) * 100
             perc_losers = (losers / total) * 100
@@ -209,12 +251,11 @@ class SetupSignals(BinbotApi):
 
             if perc_losers > 70:
                 self.market_domination_trend = "losers"
+            
+            self.btc_change_perc = self.get_latest_btc_price()
 
             print(
-                f"[{datetime.now()}] Current USDT market trend is: {self.market_domination_trend}"
-            )
-            self._send_msg(
-                f"[{datetime.now()}] Current USDT market #trend is dominated by {self.market_domination_trend}"
+                f"[{datetime.now()}] Current USDT market trend is: {self.market_domination_trend}. BTC 24hr change: {self.btc_change_perc}"
             )
             self.market_domination_ts = datetime.now() + timedelta(minutes=15)
         return
@@ -224,7 +265,9 @@ class ResearchSignals(SetupSignals):
     def __init__(self):
         info("Started research signals")
         self.last_processed_kline = {}
-        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True, on_close=self.handle_close)
+        self.client = SpotWebsocketStreamClient(
+            on_message=self.on_message, on_close=self.handle_close
+        )
         super().__init__()
 
     def new_tokens(self, projects) -> list:
@@ -244,8 +287,10 @@ class ResearchSignals(SetupSignals):
         return new_pairs
 
     def handle_close(self, message):
-        print(f'Closing research signals: {message}')
-        self.client = SpotWebsocketStreamClient(on_message=self.on_message, is_combined=True, on_close=self.handle_close)
+        logging.error(f"Closing research signals: {message}")
+        self.client = SpotWebsocketStreamClient(
+            on_message=self.on_message, is_combined=True, on_close=self.handle_close
+        )
         self.start_stream()
 
     def on_message(self, ws, message):
@@ -254,24 +299,34 @@ class ResearchSignals(SetupSignals):
         if "result" in res:
             print(f'Subscriptions: {res["result"]}')
 
-        if "data" in res:
-            if "e" in res["data"] and res["data"]["e"] == "kline":
-                self.process_kline_stream(res["data"])
-            else:
-                print(f'Error: {res["data"]}')
-                self.client.stop()
+        if "e" in res and res["e"] == "kline":
+            self.process_kline_stream(res)
 
     def start_stream(self):
         logging.info("Initializing Research signals")
         self.load_data()
         exchange_info = self._exchange_info()
-        raw_symbols = set(coin["symbol"] for coin in exchange_info["symbols"] if coin["status"] == "TRADING" and coin["symbol"].endswith(self.settings["balance_to_use"]))
+        raw_symbols = set(
+            coin["symbol"]
+            for coin in exchange_info["symbols"]
+            if coin["status"] == "TRADING"
+            and coin["symbol"].endswith(self.settings["balance_to_use"])
+        )
 
         black_list = set(x["pair"] for x in self.blacklist_data)
         market = raw_symbols - black_list
         params = []
+        subscription_list = []
         for m in market:
             params.append(f"{m.lower()}")
+            subscription_list.append({
+                "_id": m,
+                "pair": m,
+                "blacklisted": False,
+            })
+
+        # update DB
+        self.update_subscribed_list(subscription_list)
 
         total_threads = math.floor(len(market) / self.max_request) + (
             1 if len(market) % self.max_request > 0 else 0
@@ -279,6 +334,7 @@ class ResearchSignals(SetupSignals):
         # It's not possible to have websockets with more 950 pairs
         # So set default to max 950
         stream = params[:950]
+        params.append("BTCUSDT")
 
         if total_threads > 1 or not self.max_request:
             for index in range(total_threads - 1):
@@ -326,6 +382,10 @@ class ResearchSignals(SetupSignals):
             ma_25 = data["trace"][2]["y"]
             ma_7 = data["trace"][3]["y"]
 
+            macd = data["macd"]
+            macd_signal = data["macd_signal"]
+            rsi = data["rsi"]
+
             if len(ma_100) == 0:
                 msg = f"Not enough ma_100 data: {symbol}"
                 print(msg)
@@ -334,14 +394,85 @@ class ResearchSignals(SetupSignals):
             # Average amplitude
             msg = None
             list_prices = numpy.array(data["trace"][0]["close"])
-            sd = round_numbers((numpy.std(list_prices.astype(numpy.single))), 2)
+            sd = round_numbers(numpy.std(list_prices.astype(numpy.single)), 4)
 
             # historical lowest for short_buy_price
             lowest_price = numpy.min(
                 numpy.array(data["trace"][0]["close"]).astype(numpy.single)
             )
 
-            # if self.market_domination_trend == "gainers":
+            # COIN/BTC correlation: closer to 1 strong
+            btc_correlation = data["btc_correlation"]
+
+            if self.market_domination_trend == "gainers":
+                top_gainers_drop(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope,
+                    btc_correlation,
+                )
+
+                fast_and_slow_macd(
+                    self,
+                    close_price,
+                    symbol,
+                    macd,
+                    macd_signal,
+                    ma_7,
+                    ma_25,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                )
+                buy_low_sell_high(
+                    self,
+                    close_price,
+                    symbol,
+                    rsi,
+                    ma_25,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                )
+
+            rally_or_pullback(
+                self,
+                close_price,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                pvalue,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                slope,
+                btc_correlation,
+            )
+
+            if self.market_domination_trend == "gainers":
+                price_rise_15(
+                    self,
+                    close_price,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    data["trace"][0]["close"][-2],
+                    p_value=pvalue,
+                    r_value=rvalue,
+                    btc_correlation=btc_correlation,
+                )
+
             ma_candlestick_jump(
                 self,
                 close_price,
@@ -356,28 +487,26 @@ class ResearchSignals(SetupSignals):
                 lowest_price,
                 slope=slope,
                 p_value=pvalue,
-                r_value=rvalue,
+                btc_correlation=btc_correlation,
             )
 
-            if self.market_domination_trend == "losers":
-                ma_candlestick_drop(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope=slope,
-                    p_value=pvalue,
-                    r_value=rvalue,
-                )
+            ma_candlestick_drop(
+                self,
+                close_price,
+                open_price,
+                ma_7,
+                ma_100,
+                ma_25,
+                symbol,
+                sd,
+                self._send_msg,
+                process_autotrade_restrictions,
+                lowest_price,
+                slope=slope,
+                p_value=pvalue,
+                btc_correlation=btc_correlation,
+            )
 
-            
             self.last_processed_kline[symbol] = time()
 
         # If more than 6 hours passed has passed
@@ -387,7 +516,6 @@ class ResearchSignals(SetupSignals):
             and (float(time()) - float(self.last_processed_kline[symbol])) > 6000
         ):
             del self.last_processed_kline[symbol]
-
 
         self.market_domination()
         pass

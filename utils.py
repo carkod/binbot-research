@@ -76,3 +76,26 @@ def handle_binance_errors(response: Response):
             return content
     except HTTPError:
         raise HTTPError(content["msg"])
+
+def define_strategy(btc_change, btc_correlation):
+    """
+    Use BTC percengage change and correlation coin vs BTC
+    to decide trend, that is, bot strategy to follow
+    long or margin_short
+    """
+    btc_change = float(btc_change)
+    correlation = btc_correlation["close_price"]
+    # Strong correlation with BTC
+    if btc_change > 0 and correlation > 0.6:
+        trend = "uptrend"
+    elif btc_change < 0 and correlation > 0.6:
+        trend = "downtrend"
+    # Weak correlation with BTC, go opposite
+    elif btc_change > 0 and correlation < 0.1:
+        trend = "downtrend"
+    elif btc_change < 0 and correlation < 0.1:
+        trend = "uptrend"
+    else:
+        trend = None
+
+    return trend

@@ -58,11 +58,10 @@ class QFL_signals(SetupSignals):
         )
         dates = numpy.array(data["trace"][0]["x"])
         slope, intercept, rvalue, pvalue, stderr = linregress(dates, list_prices)
-        return sd, lowest_price, slope
+        return sd, lowest_price, slope, data["btc_correlation"]
 
     async def on_message(self, payload):
         response = payload.json()
-        print(f"Market domination trend: {self.market_domination_trend}")
         if response["type"] in ["base-break", "panic"]:
             exchange_str, pair = response["marketInfo"]["ticker"].split(":")
             is_leveraged_token = bool(re.search("UP/", pair)) or bool(
@@ -89,20 +88,22 @@ class QFL_signals(SetupSignals):
                 # Because signals for other market could influence also USDT market
                 trading_pair = asset + "USDT"
 
-                if response["type"] == "base-break":
-                    message = (
-                        f"\nAlert Price: {alert_price}"
-                        f"\n- Base Price:{response['basePrice']}"
-                        f"\n- Volume: {volume24}"
-                        f"\n- <a href='{hodloo_url}'>Hodloo</a>"
-                        "\n- Running autotrade"
-                    )
+                try:
+                    sd, lowest_price, slope, btc_correlation = self.get_stats(trading_pair)
+                except Exception:
+                    return
+                
 
-                    try:
-                        sd, lowest_price, slope = self.get_stats(trading_pair)
-                    except Exception:
-                        return
-                    
+                if response["type"] == "base-break":
+                    message = (f"""
+                        \nAlert Price: {alert_price}
+                        \n- Base Price:{response['basePrice']}
+                        \n- Volume: {volume24}"
+                        \n- Correlation with BTC: {btc_correlation['close_price']}
+                        \n- <a href='{hodloo_url}'>Hodloo</a>"
+                        \n- Running autotrade
+                    """)
+
                     # if self.market_domination_trend == "gainers":
                     #     process_autotrade_restrictions(
                     #         self,
@@ -134,6 +135,7 @@ class QFL_signals(SetupSignals):
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
                         f"-\n slope: {slope}"
+                        f"\n- Correlation with BTC: {btc_correlation['close_price']}"
                         f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )
@@ -152,22 +154,18 @@ class QFL_signals(SetupSignals):
                     except Exception:
                         return
 
-                    # From trial and fail, it seems market_domination is a better
-                    # measure than slope i.e. when most assets are going down
-                    # panic is likely going down
-                    if self.market_domination_trend == "losers":
-                        process_autotrade_restrictions(
-                            self,
-                            trading_pair,
-                            "hodloo_qfl_signals_panic",
-                            test_only=False,
-                            **{
-                                "sd": sd,
-                                "current_price": alert_price,
-                                "lowest_price": lowest_price,
-                                "trend": "downtrend",
-                            },
-                        )
+                    process_autotrade_restrictions(
+                        self,
+                        trading_pair,
+                        "hodloo_qfl_signals_panic",
+                        test_only=False,
+                        **{
+                            "sd": sd,
+                            "current_price": alert_price,
+                            "lowest_price": lowest_price,
+                            "trend": "downtrend",
+                        },
+                    )
                         
 
                     self.custom_telegram_msg(
@@ -175,6 +173,7 @@ class QFL_signals(SetupSignals):
                         f"-\n lowest price: {lowest_price}"
                         f"-\n sd: {sd}"
                         f"-\n slope: {slope}"
+                        f"\n- Correlation with BTC: {btc_correlation['close_price']}"
                         f"-\n market domination: {self.market_domination_trend}",
                         symbol=trading_pair,
                     )

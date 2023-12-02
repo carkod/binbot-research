@@ -34,6 +34,7 @@ class Autotrade(BinbotApi):
         self.settings = settings # both settings and test_settings
         self.decimals = self.price_precision(pair)
         current_date = datetime.now().strftime("%Y-%m-%dT%H:%M")
+        self.algorithm_name = algorithm_name
         self.default_bot = {
             "pair": pair,
             "status": "inactive",
@@ -56,14 +57,14 @@ class Autotrade(BinbotApi):
             "errors": [],
         }
         self.db_collection_name = db_collection_name
-        self.blacklist = None
+        self.blacklist: list | None = None
         blacklist_res = self.get_blacklist()
         if not "error" in blacklist_res:
             self.blacklist = blacklist_res["data"]
     
     def handle_error(self, msg):
         """
-        Check balance to decide balance_to_use
+        Submit errors to event logs of the bot
         """
         try:
             self.settings["system_logs"].append(msg)
@@ -74,6 +75,10 @@ class Autotrade(BinbotApi):
         res = requests.put(url=self.bb_autotrade_settings_url, json=self.settings)
         result = handle_binance_errors(res)
         return result
+
+    def submit_bot_event_logs(self, bot_id, message):
+        res = requests.post(url=f"{self.bb_submit_errors}/{bot_id}", json=message)
+        return res
 
     def add_to_blacklist(self, symbol, reason=None):
         data = {"symbol": symbol, "reason": reason}
@@ -96,10 +101,14 @@ class Autotrade(BinbotApi):
         self.default_bot["strategy"] = "margin_short"
         # self.default_bot["base_order_size"] = float(self.default_bot["base_order_size"]) * (1 + float(self.default_bot["stop_loss"]))
         self.default_bot["trailling"] = True
-        self.default_bot["trailling_deviation"] = margin_short_volatility
         # Binances forces isolated pair to go through 24hr deactivation after traded
         self.default_bot["cooldown"] = 1440
         self.default_bot["margin_short_reversal"] = True
+
+        # Override for top_gainers_drop
+        if self.algorithm_name == "top_gainers_drop":
+            self.default_bot["stop_loss"] = 5
+            self.default_bot["trailling_deviation"] = 3.2
 
     def handle_price_drops(
         self,
@@ -288,13 +297,20 @@ class Autotrade(BinbotApi):
         res = requests.get(url=self.bb_balance_url)
         balances = handle_binance_errors(res)
         qty = 0
+        self.default_bot["strategy"] = self.settings["strategy"]
+
+        if "trend" in kwargs:
+            if kwargs["trend"] == "downtrend":
+                self.default_bot["strategy"] = "margin_short"
+            else:
+                self.default_bot["strategy"] = "long"
 
         if self.db_collection_name == "paper_trading":
             # Dynamic switch to real bot URLs
             bot_url = self.bb_test_bot_url
             activate_url = self.bb_activate_test_bot_url
 
-            if self.settings["strategy"] == "margin_short":
+            if self.default_bot["strategy"] == "margin_short":
                 self.set_margin_short_values(kwargs)
                 pass
             else:
@@ -309,7 +325,7 @@ class Autotrade(BinbotApi):
             bot_url = self.bb_bot_url
             activate_url = self.bb_activate_bot_url
 
-            if self.settings["strategy"] == "margin_short":
+            if self.default_bot["strategy"] == "margin_short":
                 ticker = self.ticker_price(self.default_bot["pair"])
                 initial_price = ticker["price"]
                 estimate_qty = float(self.default_bot["base_order_size"]) / float(initial_price)
@@ -339,14 +355,19 @@ class Autotrade(BinbotApi):
 
         # Activate bot
         botId = create_bot["botId"]
-        print(f"Trying to activate {self.db_collection_name}...")
         res = requests.get(url=f"{activate_url}/{botId}")
-        bot = handle_binance_errors(res)
+        bot = res.json()
 
-        print(
-            f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
-        )
-        pass
+        if "error" in bot and bot["error"] > 0:
+            message = bot["message"]
+            self.submit_bot_event_logs(botId, message)
+            self.blacklist.append(self.default_bot["pair"])
+            raise AutotradeError(message)
+
+        else:
+            message = f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
+            self.submit_bot_event_logs(botId, message)
+
 
 def process_autotrade_restrictions(
     self, symbol, algorithm, test_only=False, *args, **kwargs

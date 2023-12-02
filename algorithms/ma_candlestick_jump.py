@@ -1,5 +1,5 @@
 import os
-
+from utils import define_strategy
 
 def ma_candlestick_jump(
     self,
@@ -15,7 +15,7 @@ def ma_candlestick_jump(
     lowest_price,
     slope,
     p_value,
-    r_value
+    btc_correlation,
 ):
     """
     Candlesticks are in an upward trending motion for several periods
@@ -43,9 +43,11 @@ def ma_candlestick_jump(
         and open_price > ma_7[len(ma_7) - 2]
         and close_price > ma_100[len(ma_100) - 1]
         and open_price > ma_100[len(ma_100) - 1]
-        # remove high standard deviation
-        and float(sd) / float(close_price) < 0.07
     ):
+        
+        trend = define_strategy(self.btc_change_perc, btc_correlation)
+        if not trend:
+            return
 
         msg = (f"""
 - [{os.getenv('ENV')}] Candlestick <strong>#jump algorithm</strong> #{symbol}
@@ -55,13 +57,15 @@ def ma_candlestick_jump(
 - Percentage volatility x2: {sd * 2 / float(close_price)}
 - Slope: {slope}
 - P-value: {p_value}
-- Pearson correlation: {r_value}
+- Pearson correlation with BTC: {btc_correlation["close_price"]}
+- Trend: {trend}
+- BTC 24hr change: {self.btc_change_perc}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
         _send_msg(msg)
         print(msg)
 
-        run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
+        run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend })
 
     return
