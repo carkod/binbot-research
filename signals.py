@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
-from requests import get
+from requests import HTTPError, get
 
 import numpy
 import pandas as pd
@@ -193,7 +193,11 @@ class SetupSignals(BinbotApi):
 
         if db_collection_name == "bots":
             if not self.settings:
-                self.load_data()
+                try:
+                    self.load_data()
+                except HTTPError as e:
+                    logging.error(e)
+
             active_bots_res = requests.get(
                 url=self.bb_bot_url, params={"status": "active"}
             )
@@ -405,22 +409,7 @@ class ResearchSignals(SetupSignals):
             btc_correlation = data["btc_correlation"]
 
             if self.market_domination_trend == "gainers":
-                top_gainers_drop(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope,
-                    btc_correlation,
-                )
-
+      
                 fast_and_slow_macd(
                     self,
                     close_price,
@@ -442,24 +431,6 @@ class ResearchSignals(SetupSignals):
                     process_autotrade_restrictions,
                 )
 
-            rally_or_pullback(
-                self,
-                close_price,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                pvalue,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                slope,
-                btc_correlation,
-            )
-
-            if self.market_domination_trend == "gainers":
                 price_rise_15(
                     self,
                     close_price,
@@ -473,41 +444,74 @@ class ResearchSignals(SetupSignals):
                     btc_correlation=btc_correlation,
                 )
 
-            ma_candlestick_jump(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope=slope,
-                p_value=pvalue,
-                btc_correlation=btc_correlation,
-            )
+                rally_or_pullback(
+                    self,
+                    close_price,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    pvalue,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    slope,
+                    btc_correlation,
+                )
 
-            ma_candlestick_drop(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope=slope,
-                p_value=pvalue,
-                btc_correlation=btc_correlation,
-            )
+                ma_candlestick_jump(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope=slope,
+                    p_value=pvalue,
+                    btc_correlation=btc_correlation,
+                )
 
-            self.last_processed_kline[symbol] = time()
+                ma_candlestick_drop(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope=slope,
+                    p_value=pvalue,
+                    btc_correlation=btc_correlation,
+                )
+
+                top_gainers_drop(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope,
+                    btc_correlation,
+                )
+
+                self.last_processed_kline[symbol] = time()
 
         # If more than 6 hours passed has passed
         # Then we should resume sending signals for given symbol

@@ -49,6 +49,4 @@ def price_rise_15(
     _send_msg(msg)
 
     run_autotrade(self, symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "trend": trend})
-
-
     return
