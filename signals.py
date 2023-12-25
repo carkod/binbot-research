@@ -255,7 +255,7 @@ class SetupSignals(BinbotApi):
 
             if perc_losers > 70:
                 self.market_domination_trend = "losers"
-            
+
             self.btc_change_perc = self.get_latest_btc_price()
 
             print(
@@ -270,7 +270,9 @@ class ResearchSignals(SetupSignals):
         info("Started research signals")
         self.last_processed_kline = {}
         self.client = SpotWebsocketStreamClient(
-            on_message=self.on_message, on_close=self.handle_close
+            on_message=self.on_message,
+            on_close=self.handle_close,
+            on_error=self.handle_close,
         )
         super().__init__()
 
@@ -293,7 +295,9 @@ class ResearchSignals(SetupSignals):
     def handle_close(self, message):
         logging.error(f"Closing research signals: {message}")
         self.client = SpotWebsocketStreamClient(
-            on_message=self.on_message, is_combined=True, on_close=self.handle_close
+            on_message=self.on_message,
+            on_close=self.handle_close,
+            on_error=self.handle_close,
         )
         self.start_stream()
 
@@ -323,11 +327,13 @@ class ResearchSignals(SetupSignals):
         subscription_list = []
         for m in market:
             params.append(f"{m.lower()}")
-            subscription_list.append({
-                "_id": m,
-                "pair": m,
-                "blacklisted": False,
-            })
+            subscription_list.append(
+                {
+                    "_id": m,
+                    "pair": m,
+                    "blacklisted": False,
+                }
+            )
 
         # update DB
         self.update_subscribed_list(subscription_list)
@@ -409,7 +415,6 @@ class ResearchSignals(SetupSignals):
             btc_correlation = data["btc_correlation"]
 
             if self.market_domination_trend == "gainers":
-      
                 fast_and_slow_macd(
                     self,
                     close_price,
