@@ -327,33 +327,42 @@ class ResearchSignals(SetupSignals):
         subscription_list = []
         for m in market:
             params.append(f"{m.lower()}")
-            subscription_list.append(
-                {
-                    "_id": m,
-                    "pair": m,
-                    "blacklisted": False,
-                }
-            )
+            if m in black_list:
+                subscription_list.append(
+                    {
+                        "_id": m,
+                        "pair": m,
+                        "blacklisted": True,
+                    }
+                )
+            else:
+                subscription_list.append(
+                    {
+                        "_id": m,
+                        "pair": m,
+                        "blacklisted": False,
+                    }
+                )
 
         # update DB
         self.update_subscribed_list(subscription_list)
-
-        total_threads = math.floor(len(market) / self.max_request) + (
-            1 if len(market) % self.max_request > 0 else 0
-        )
+        
         # It's not possible to have websockets with more 950 pairs
         # So set default to max 950
-        stream = params[:950]
-        params.append("BTCUSDT")
+        # total_threads = math.floor(len(market) / self.max_request) + (
+        #     1 if len(market) % self.max_request > 0 else 0
+        # )
+        # stream = params[:950]
+        # params.append("BTCUSDT")
 
-        if total_threads > 1 or not self.max_request:
-            for index in range(total_threads - 1):
-                stream = params[(self.max_request + 1) :]
-                if index == 0:
-                    stream = params[: self.max_request]
-                self.client.klines(markets=stream, interval=self.interval)
-        else:
-            self.client.klines(markets=stream, interval=self.interval)
+        # if total_threads > 1 or not self.max_request:
+        #     for index in range(total_threads - 1):
+        #         stream = params[(self.max_request + 1) :]
+        #         if index == 0:
+        #             stream = params[: self.max_request]
+        #         self.client.klines(markets=stream, interval=self.interval)
+        # else:
+        self.client.klines(markets=params, interval=self.interval)
 
     def process_kline_stream(self, result):
         """
