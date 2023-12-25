@@ -193,10 +193,7 @@ class SetupSignals(BinbotApi):
 
         if db_collection_name == "bots":
             if not self.settings:
-                try:
-                    self.load_data()
-                except HTTPError as e:
-                    logging.error(e)
+                self.load_data()
 
             active_bots_res = requests.get(
                 url=self.bb_bot_url, params={"status": "active"}

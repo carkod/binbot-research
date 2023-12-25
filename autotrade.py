@@ -268,12 +268,9 @@ class Autotrade(BinbotApi):
                 rate = rate["price"]
                 qty = supress_notation(b["free"], self.decimals)
                 # Round down to 6 numbers to avoid not enough funds
-                try:
-                    base_order_size = (
-                        math.floor((float(qty) / float(rate)) * 10000000) / 10000000
-                    )
-                except Exception as error:
-                    print(error)
+                base_order_size = (
+                    math.floor((float(qty) / float(rate)) * 10000000) / 10000000
+                )
                 self.default_bot["base_order_size"] = supress_notation(
                     base_order_size, self.decimals
                 )
