@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from logging import info
 from time import sleep, time
-from requests import get
+from requests import HTTPError, get
 
 import numpy
 import pandas as pd
@@ -193,7 +193,11 @@ class SetupSignals(BinbotApi):
 
         if db_collection_name == "bots":
             if not self.settings:
-                self.load_data()
+                try:
+                    self.load_data()
+                except HTTPError as e:
+                    logging.error(e)
+
             active_bots_res = requests.get(
                 url=self.bb_bot_url, params={"status": "active"}
             )
@@ -251,7 +255,7 @@ class SetupSignals(BinbotApi):
 
             if perc_losers > 70:
                 self.market_domination_trend = "losers"
-            
+
             self.btc_change_perc = self.get_latest_btc_price()
 
             print(
@@ -266,7 +270,9 @@ class ResearchSignals(SetupSignals):
         info("Started research signals")
         self.last_processed_kline = {}
         self.client = SpotWebsocketStreamClient(
-            on_message=self.on_message, on_close=self.handle_close
+            on_message=self.on_message,
+            on_close=self.handle_close,
+            on_error=self.handle_close,
         )
         super().__init__()
 
@@ -289,7 +295,9 @@ class ResearchSignals(SetupSignals):
     def handle_close(self, message):
         logging.error(f"Closing research signals: {message}")
         self.client = SpotWebsocketStreamClient(
-            on_message=self.on_message, is_combined=True, on_close=self.handle_close
+            on_message=self.on_message,
+            on_close=self.handle_close,
+            on_error=self.handle_close,
         )
         self.start_stream()
 
@@ -319,31 +327,42 @@ class ResearchSignals(SetupSignals):
         subscription_list = []
         for m in market:
             params.append(f"{m.lower()}")
-            subscription_list.append({
-                "_id": m,
-                "pair": m,
-                "blacklisted": False,
-            })
+            if m in black_list:
+                subscription_list.append(
+                    {
+                        "_id": m,
+                        "pair": m,
+                        "blacklisted": True,
+                    }
+                )
+            else:
+                subscription_list.append(
+                    {
+                        "_id": m,
+                        "pair": m,
+                        "blacklisted": False,
+                    }
+                )
 
         # update DB
         self.update_subscribed_list(subscription_list)
-
-        total_threads = math.floor(len(market) / self.max_request) + (
-            1 if len(market) % self.max_request > 0 else 0
-        )
+        
         # It's not possible to have websockets with more 950 pairs
         # So set default to max 950
-        stream = params[:950]
-        params.append("BTCUSDT")
+        # total_threads = math.floor(len(market) / self.max_request) + (
+        #     1 if len(market) % self.max_request > 0 else 0
+        # )
+        # stream = params[:950]
+        # params.append("BTCUSDT")
 
-        if total_threads > 1 or not self.max_request:
-            for index in range(total_threads - 1):
-                stream = params[(self.max_request + 1) :]
-                if index == 0:
-                    stream = params[: self.max_request]
-                self.client.klines(markets=stream, interval=self.interval)
-        else:
-            self.client.klines(markets=stream, interval=self.interval)
+        # if total_threads > 1 or not self.max_request:
+        #     for index in range(total_threads - 1):
+        #         stream = params[(self.max_request + 1) :]
+        #         if index == 0:
+        #             stream = params[: self.max_request]
+        #         self.client.klines(markets=stream, interval=self.interval)
+        # else:
+        self.client.klines(markets=params, interval=self.interval)
 
     def process_kline_stream(self, result):
         """
@@ -405,22 +424,6 @@ class ResearchSignals(SetupSignals):
             btc_correlation = data["btc_correlation"]
 
             if self.market_domination_trend == "gainers":
-                top_gainers_drop(
-                    self,
-                    close_price,
-                    open_price,
-                    ma_7,
-                    ma_100,
-                    ma_25,
-                    symbol,
-                    sd,
-                    self._send_msg,
-                    process_autotrade_restrictions,
-                    lowest_price,
-                    slope,
-                    btc_correlation,
-                )
-
                 fast_and_slow_macd(
                     self,
                     close_price,
@@ -442,24 +445,6 @@ class ResearchSignals(SetupSignals):
                     process_autotrade_restrictions,
                 )
 
-            rally_or_pullback(
-                self,
-                close_price,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                pvalue,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                slope,
-                btc_correlation,
-            )
-
-            if self.market_domination_trend == "gainers":
                 price_rise_15(
                     self,
                     close_price,
@@ -473,41 +458,74 @@ class ResearchSignals(SetupSignals):
                     btc_correlation=btc_correlation,
                 )
 
-            ma_candlestick_jump(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope=slope,
-                p_value=pvalue,
-                btc_correlation=btc_correlation,
-            )
+                rally_or_pullback(
+                    self,
+                    close_price,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    pvalue,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    slope,
+                    btc_correlation,
+                )
 
-            ma_candlestick_drop(
-                self,
-                close_price,
-                open_price,
-                ma_7,
-                ma_100,
-                ma_25,
-                symbol,
-                sd,
-                self._send_msg,
-                process_autotrade_restrictions,
-                lowest_price,
-                slope=slope,
-                p_value=pvalue,
-                btc_correlation=btc_correlation,
-            )
+                ma_candlestick_jump(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope=slope,
+                    p_value=pvalue,
+                    btc_correlation=btc_correlation,
+                )
 
-            self.last_processed_kline[symbol] = time()
+                ma_candlestick_drop(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope=slope,
+                    p_value=pvalue,
+                    btc_correlation=btc_correlation,
+                )
+
+                top_gainers_drop(
+                    self,
+                    close_price,
+                    open_price,
+                    ma_7,
+                    ma_100,
+                    ma_25,
+                    symbol,
+                    sd,
+                    self._send_msg,
+                    process_autotrade_restrictions,
+                    lowest_price,
+                    slope,
+                    btc_correlation,
+                )
+
+                self.last_processed_kline[symbol] = time()
 
         # If more than 6 hours passed has passed
         # Then we should resume sending signals for given symbol

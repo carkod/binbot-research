@@ -4,12 +4,9 @@ import os
 from decimal import Decimal
 from random import randrange
 from urllib.parse import urlencode
-
 from dotenv import load_dotenv
 from requests import Session, get, post
-
 from utils import handle_binance_errors
-from typing import Literal
 
 load_dotenv()
 
