@@ -80,10 +80,7 @@ class QFL_signals(SetupSignals):
                 volume24 = response["marketInfo"]["volume24"]
                 alert_price = float(response["marketInfo"]["price"])
 
-                try:
-                    self.check_asset(asset)
-                except Exception:
-                    return
+                self.check_asset(asset)
 
                 # Because signals for other market could influence also USDT market
                 trading_pair = asset + "USDT"
@@ -149,10 +146,7 @@ class QFL_signals(SetupSignals):
                         f'\n- <a href="{hodloo_url}">Hodloo</a>'
                     )
 
-                    try:
-                        sd, lowest_price, slope = self.get_stats(trading_pair)
-                    except Exception:
-                        return
+                    sd, lowest_price, slope = self.get_stats(trading_pair)
 
                     process_autotrade_restrictions(
                         self,

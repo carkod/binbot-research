@@ -34,7 +34,6 @@ class BinanceApi:
     avg_price = f"{BASE}/api/v3/avgPrice"
     open_orders = f"{BASE}/api/v3/openOrders"
     all_orders_url = f"{BASE}/api/v3/allOrders"
-    user_data_stream = f"{BASE}/api/v3/userDataStream"
     trade_fee = f"{BASE}/sapi/v1/asset/tradeFee"
 
     user_data_stream = f"{BASE}/api/v3/userDataStream"

@@ -3,7 +3,9 @@ import asyncio
 
 from qfl_signals import QFL_signals
 from signals import ResearchSignals
-from websocket._exceptions import WebSocketConnectionClosedException
+from websocket import (
+    WebSocketException,
+)
 
 logging.basicConfig(
     filename="./binbot-research.log",
@@ -24,12 +26,9 @@ if __name__ == "__main__":
     try:
         rs = ResearchSignals()
         rs.start_stream()
-        asyncio.run(signals_main())
-    except WebSocketConnectionClosedException as error:
-        rs = ResearchSignals()
-        rs.start_stream()
+        # asyncio.run(signals_main())
     except Exception as error:
-        logging.error(error)
-        asyncio.run(signals_main())
+        logging.error(f'Hey ya normal exception: {error}')
+        # asyncio.run(signals_main())
         rs = ResearchSignals()
         rs.start_stream()
