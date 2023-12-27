@@ -26,9 +26,7 @@ if __name__ == "__main__":
     try:
         rs = ResearchSignals()
         rs.start_stream()
-        # asyncio.run(signals_main())
     except Exception as error:
         logging.error(f'Hey ya normal exception: {error}')
-        # asyncio.run(signals_main())
         rs = ResearchSignals()
         rs.start_stream()
