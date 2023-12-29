@@ -189,6 +189,7 @@ class BinbotApi(BinanceApi):
     bb_bot_url = f"{bb_base_url}/bot"
     bb_activate_bot_url = f"{bb_base_url}/bot/activate"
     bb_gainers_losers = f"{bb_base_url}/account/gainers-losers"
+    bb_market_domination = f"{bb_base_url}/account/market-domination"
 
     # Trade operations
     bb_buy_order_url = f"{bb_base_url}/order/buy"

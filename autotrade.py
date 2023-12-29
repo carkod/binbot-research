@@ -200,7 +200,7 @@ class Autotrade(BinbotApi):
                 )
         return
     
-    def set_bot_values(self, kwargs, qty):
+    def set_bot_values(self, kwargs):
         """
         Set values for default_bot
         """
@@ -209,7 +209,8 @@ class Autotrade(BinbotApi):
             "balance_to_use"
         ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
         self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
-        self.default_bot["dynamic_trailling"] = True
+        # self.default_bot["dynamic_trailling"] = False
+        self.default_bot["margin_short_reversal"] = True
 
         if "sd" in kwargs and "current_price" in kwargs:
             sd = kwargs["sd"]
@@ -336,7 +337,7 @@ class Autotrade(BinbotApi):
                 self.set_margin_short_values(kwargs)
                 pass
             else:
-                self.set_bot_values(kwargs, qty)
+                self.set_bot_values(kwargs)
                 pass
 
         # Create bot

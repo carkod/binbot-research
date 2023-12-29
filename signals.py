@@ -220,45 +220,35 @@ class SetupSignals(BinbotApi):
             print(
                 f"Performing market domination analyses. Current trend: {self.market_domination_trend}"
             )
-            res = get(url=self.bb_gainers_losers)
+            res = get(url=self.bb_market_domination)
             data = handle_binance_errors(res)
             gainers = 0
             losers = 0
-            for item in data["data"]:
-                if float(item["priceChangePercent"]) > 0:
+            # reverse to make latest series more important
+            data["data"]["gainers_count"].reverse()
+            data["data"]["losers_count"].reverse()
+            gainers_count = data["data"]["gainers_count"]
+            losers_count = data["data"]["losers_count"]
+            self.market_domination_trend = None
+            for i, item in enumerate(losers_count):
+                if float(item) > gainers_count[i]:
                     gainers += 1
-                elif float(item["priceChangePercent"]) == 0:
-                    continue
+                    # Enough gainers to assess that this trend will continue
+                    if gainers > 4:
+                        self.market_domination_trend = "gainers"
+                        break
                 else:
                     losers += 1
-
-            # Load constraints for top_gainers_drop algo
-            available_bots = self.settings["max_active_autotrade_bots"] - len(
-                self.active_symbols
-            )
-            if available_bots > 0:
-                for i, coin in enumerate(data["data"]):
-                    if i <= available_bots:
-                        self.top_coins_gainers.append(coin["symbol"])
-                    else:
+                    if losers > 4:
+                        self.market_domination_trend = "losers"
                         break
-
-            total = gainers + losers
-            perc_gainers = (gainers / total) * 100
-            perc_losers = (losers / total) * 100
-
-            if perc_gainers > 70:
-                self.market_domination_trend = "gainers"
-
-            if perc_losers > 70:
-                self.market_domination_trend = "losers"
 
             self.btc_change_perc = self.get_latest_btc_price()
 
             print(
                 f"[{datetime.now()}] Current USDT market trend is: {self.market_domination_trend}. BTC 24hr change: {self.btc_change_perc}"
             )
-            self.market_domination_ts = datetime.now() + timedelta(minutes=15)
+            self.market_domination_ts = datetime.now() + timedelta(hours=4)
         return
 
 
@@ -269,7 +259,7 @@ class ResearchSignals(SetupSignals):
         self.client = SpotWebsocketStreamClient(
             on_message=self.on_message,
             on_close=self.handle_close,
-            on_error=self.handle_close,
+            on_error=self.handle_error,
         )
         super().__init__()
 
@@ -290,13 +280,17 @@ class ResearchSignals(SetupSignals):
         return new_pairs
 
     def handle_close(self, message):
-        logging.error(f"Closing research signals: {message}")
+        logging.info(f"Closing research signals: {message}")
         self.client = SpotWebsocketStreamClient(
             on_message=self.on_message,
             on_close=self.handle_close,
-            on_error=self.handle_close,
+            on_error=self.handle_error,
         )
         self.start_stream()
+
+    def handle_error(self, socket, message):
+        logging.error(f"Error research signals: {message}")
+        pass
 
     def on_message(self, ws, message):
         res = json.loads(message)
