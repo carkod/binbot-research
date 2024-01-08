@@ -55,6 +55,7 @@ class Autotrade(BinbotApi):
             "short_buy_price": 0,
             "short_sell_price": 0,
             "errors": [],
+            "dynamic_trailling": False
         }
         self.db_collection_name = db_collection_name
         self.blacklist: list | None = None
@@ -209,10 +210,9 @@ class Autotrade(BinbotApi):
             "balance_to_use"
         ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
         self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
-        # self.default_bot["dynamic_trailling"] = False
         self.default_bot["margin_short_reversal"] = True
 
-        if "sd" in kwargs and "current_price" in kwargs:
+        if "sd" in kwargs and "current_price" in kwargs and self.default_bot["dynamic_trailling"]:
             sd = kwargs["sd"]
             self.default_bot["sd"] = sd
             volatility = (sd / 2) / float(kwargs["current_price"])

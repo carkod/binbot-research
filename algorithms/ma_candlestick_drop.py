@@ -43,7 +43,7 @@ def ma_candlestick_drop(
         and (abs(float(close_price) - float(open_price)) / float(close_price)) > 0.02
     ):
         
-        trend = define_strategy(self.btc_change_perc, btc_correlation)
+        trend = define_strategy(self)
         if not trend:
             return
 

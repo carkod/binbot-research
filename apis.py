@@ -246,6 +246,11 @@ class BinbotApi(BinanceApi):
         data = handle_binance_errors(res)
         return data
 
+    def get_market_domination_series(self):
+        res = get(url=self.bb_market_domination, params={"size": 7})
+        data = handle_binance_errors(res)
+        return data
+
 class CBSApi:
     cbs_root_url = "https://api.cryptobasescanner.com/"
     cbs_bases = f"{cbs_root_url}/v1/bases/"

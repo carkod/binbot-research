@@ -44,11 +44,11 @@ def ma_candlestick_jump(
         and close_price > ma_100[len(ma_100) - 1]
         and open_price > ma_100[len(ma_100) - 1]
     ):
-        
-        trend = define_strategy(self.btc_change_perc, btc_correlation)
+
+        trend = define_strategy(self)
         if not trend:
             return
-
+        
         msg = (f"""
 - [{os.getenv('ENV')}] Candlestick <strong>#jump algorithm</strong> #{symbol}
 - Current price: {close_price}
