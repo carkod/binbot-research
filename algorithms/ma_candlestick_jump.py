@@ -64,8 +64,6 @@ def ma_candlestick_jump(
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
         _send_msg(msg)
-        print(msg)
-
         run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend })
 
     return

@@ -238,6 +238,7 @@ class SetupSignals(BinbotApi):
         """
         now = datetime.now()
         momentum = self.check_market_momentum(now)
+        # momentum = True
         if (
             # now >= self.market_domination_ts
             momentum
@@ -271,9 +272,8 @@ class SetupSignals(BinbotApi):
             reversal_msg = ""
             if self.market_domination_reversal is not None:
                 reversal_msg = f"{'Positive reversal' if self.market_domination_reversal else 'Negative reversal'}"
-            print(
-                f"[{datetime.now()}] Current USDT market trend is: {reversal_msg}. BTC 24hr change: {self.btc_change_perc}"
-            )
+
+            logging.info(f"Current USDT market trend is: {reversal_msg}. BTC 24hr change: {self.btc_change_perc}")
             self.market_domination_ts = datetime.now() + timedelta(hours=1)
         pass
 

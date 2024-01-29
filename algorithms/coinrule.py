@@ -22,7 +22,7 @@ def fast_and_slow_macd(
     if macd[str(len(macd) - 1)] > macd_signal[str(len(macd_signal) - 1)] and ma_7[len(ma_7) - 1] > ma_25[len(ma_25) - 1]:
 
         trend = define_strategy(self)
-        if not trend:
+        if trend is not None:
             return
 
         msg = (f"""
@@ -30,6 +30,7 @@ def fast_and_slow_macd(
         - Current price: {close_price}
         - BTC 24hr change: {self.btc_change_perc}
         - Strategy: {trend}
+        - Reversal? {"No reversal" if not self.market_domination_reversal else "Positive" if self.market_domination_reversal else "Negative"}
         - https://www.binance.com/en/trade/{symbol}
         - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
         """)
@@ -65,6 +66,7 @@ def buy_low_sell_high(
 - Current price: {close_price}
 - BTC 24hr change: {self.btc_change_perc}
 - Strategy: {trend}
+- Reversal? {"No reversal" if not self.market_domination_reversal else "Positive" if self.market_domination_reversal else "Negative"}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
