@@ -59,6 +59,7 @@ def ma_candlestick_jump(
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
 - Trend: {trend}
+- Reversal? {"No reversal" if not self.market_domination_reversal else "Positive" if self.market_domination_reversal else "Negative"}
 - BTC 24hr change: {self.btc_change_perc}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
