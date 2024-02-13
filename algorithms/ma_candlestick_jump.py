@@ -44,11 +44,11 @@ def ma_candlestick_jump(
         and close_price > ma_100[len(ma_100) - 1]
         and open_price > ma_100[len(ma_100) - 1]
     ):
-        
-        trend = define_strategy(self.btc_change_perc, btc_correlation)
+
+        trend = define_strategy(self)
         if not trend:
             return
-
+        
         msg = (f"""
 - [{os.getenv('ENV')}] Candlestick <strong>#jump algorithm</strong> #{symbol}
 - Current price: {close_price}
@@ -59,13 +59,12 @@ def ma_candlestick_jump(
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
 - Trend: {trend}
+- Reversal? {"No reversal" if not self.market_domination_reversal else "Positive" if self.market_domination_reversal else "Negative"}
 - BTC 24hr change: {self.btc_change_perc}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
         _send_msg(msg)
-        print(msg)
-
         run_autotrade(self, symbol, "ma_candlestick_jump", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend })
 
     return

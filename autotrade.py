@@ -1,6 +1,7 @@
 import copy
 import math
 import logging
+from httpx import delete
 import requests
 
 from datetime import datetime
@@ -55,6 +56,7 @@ class Autotrade(BinbotApi):
             "short_buy_price": 0,
             "short_sell_price": 0,
             "errors": [],
+            "dynamic_trailling": False
         }
         self.db_collection_name = db_collection_name
         self.blacklist: list | None = None
@@ -83,6 +85,19 @@ class Autotrade(BinbotApi):
     def add_to_blacklist(self, symbol, reason=None):
         data = {"symbol": symbol, "reason": reason}
         res = requests.post(url=self.bb_blacklist_url, json=data)
+        result = handle_binance_errors(res)
+        return result
+
+    def clean_margin_short(self, pair):
+        """
+        Liquidate and disable margin_short trades
+        """
+        res = requests.get(url=f'{self.bb_liquidation_url}/{pair}')
+        result = handle_binance_errors(res)
+        return result
+    
+    def delete_bot(self, bot_id):
+        res = requests.delete(url=f"{self.bb_bot_url}", params={"id": bot_id})
         result = handle_binance_errors(res)
         return result
 
@@ -200,7 +215,7 @@ class Autotrade(BinbotApi):
                 )
         return
     
-    def set_bot_values(self, kwargs, qty):
+    def set_bot_values(self, kwargs):
         """
         Set values for default_bot
         """
@@ -209,9 +224,9 @@ class Autotrade(BinbotApi):
             "balance_to_use"
         ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
         self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
-        self.default_bot["dynamic_trailling"] = True
+        self.default_bot["margin_short_reversal"] = True
 
-        if "sd" in kwargs and "current_price" in kwargs:
+        if "sd" in kwargs and "current_price" in kwargs and self.default_bot["dynamic_trailling"]:
             sd = kwargs["sd"]
             self.default_bot["sd"] = sd
             volatility = (sd / 2) / float(kwargs["current_price"])
@@ -336,7 +351,7 @@ class Autotrade(BinbotApi):
                 self.set_margin_short_values(kwargs)
                 pass
             else:
-                self.set_bot_values(kwargs, qty)
+                self.set_bot_values(kwargs)
                 pass
 
         # Create bot
@@ -356,9 +371,17 @@ class Autotrade(BinbotApi):
         bot = res.json()
 
         if "error" in bot and bot["error"] > 0:
+            # Failed to activate bot so: 
+            # (1) Add to blacklist/exclude from future autotrades
+            # (2) Submit error to event logs
+            # (3) Delete inactive bot
+            # this prevents cluttering UI with loads of useless bots
             message = bot["message"]
             self.submit_bot_event_logs(botId, message)
             self.blacklist.append(self.default_bot["pair"])
+            if self.default_bot["strategy"] == "margin_short":
+                self.clean_margin_short(self.default_bot["pair"])
+            self.delete_bot(botId)
             raise AutotradeError(message)
 
         else:

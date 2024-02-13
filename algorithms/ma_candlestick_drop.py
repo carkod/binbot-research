@@ -43,7 +43,7 @@ def ma_candlestick_drop(
         and (abs(float(close_price) - float(open_price)) / float(close_price)) > 0.02
     ):
         
-        trend = define_strategy(self.btc_change_perc, btc_correlation)
+        trend = define_strategy(self)
         if not trend:
             return
 
@@ -58,12 +58,11 @@ def ma_candlestick_drop(
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
 - BTC 24hr change: {self.btc_change_perc}
 - Trend: {trend}
+- Reversal? {"No reversal" if not self.market_domination_reversal else "Positive" if self.market_domination_reversal else "Negative"}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
         _send_msg(msg)
-        print(msg)
-
         run_autotrade(self, symbol, "ma_candlestick_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
 
     return

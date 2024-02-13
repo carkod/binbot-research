@@ -189,6 +189,7 @@ class BinbotApi(BinanceApi):
     bb_bot_url = f"{bb_base_url}/bot"
     bb_activate_bot_url = f"{bb_base_url}/bot/activate"
     bb_gainers_losers = f"{bb_base_url}/account/gainers-losers"
+    bb_market_domination = f"{bb_base_url}/account/market-domination"
 
     # Trade operations
     bb_buy_order_url = f"{bb_base_url}/order/buy"
@@ -202,6 +203,7 @@ class BinbotApi(BinanceApi):
     bb_stop_buy_order_url = f"{bb_base_url}/order/buy/stop-limit"
     bb_stop_sell_order_url = f"{bb_base_url}/order/sell/stop-limit"
     bb_submit_errors = f"{bb_base_url}/bot/errors"
+    bb_liquidation_url = f"{bb_base_url}/account/one-click-liquidation"
 
     # balances
     bb_balance_url = f"{bb_base_url}/account/balance/raw"
@@ -242,6 +244,11 @@ class BinbotApi(BinanceApi):
 
     def update_subscribed_list(self, data):
         res = post(url=f'{self.bb_subscribed_list}', json=data)
+        data = handle_binance_errors(res)
+        return data
+
+    def get_market_domination_series(self):
+        res = get(url=self.bb_market_domination, params={"size": 7})
         data = handle_binance_errors(res)
         return data
 

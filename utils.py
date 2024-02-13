@@ -77,25 +77,20 @@ def handle_binance_errors(response: Response):
     except HTTPError:
         raise HTTPError(content["msg"])
 
-def define_strategy(btc_change, btc_correlation):
+def define_strategy(self):
     """
-    Use BTC percengage change and correlation coin vs BTC
-    to decide trend, that is, bot strategy to follow
-    long or margin_short
+    If market domination reversal is true, then it's already
+    implied that it's an uptred (long strategy)
+    from the market domination function
     """
-    btc_change = float(btc_change)
-    correlation = btc_correlation["close_price"]
-    # Strong correlation with BTC
-    if btc_change > 0 and correlation > 0.6:
+    trend = None
+    if self.market_domination_reversal:
         trend = "uptrend"
-    elif btc_change < 0 and correlation > 0.6:
+    
+    if not self.market_domination_reversal:
         trend = "downtrend"
-    # Weak correlation with BTC, go opposite
-    elif btc_change > 0 and correlation < 0.1:
-        trend = "downtrend"
-    elif btc_change < 0 and correlation < 0.1:
-        trend = "uptrend"
-    else:
+
+    if not self.market_domination and self.market_domination_reversal is None:
         trend = None
 
     return trend
