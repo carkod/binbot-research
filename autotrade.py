@@ -1,10 +1,10 @@
 import copy
 import math
 import logging
-from httpx import delete
 import requests
 
 from datetime import datetime
+from enums import CloseConditions, Strategy
 from apis import BinbotApi
 from utils import InvalidSymbol, handle_binance_errors, round_numbers, supress_notation
 
@@ -313,9 +313,10 @@ class Autotrade(BinbotApi):
 
         if "trend" in kwargs:
             if kwargs["trend"] == "downtrend":
-                self.default_bot["strategy"] = "margin_short"
+                self.default_bot["strategy"] = Strategy.margin_short
+                self.default_bot["close_condition"] = CloseConditions.market_reversal
             else:
-                self.default_bot["strategy"] = "long"
+                self.default_bot["strategy"] = Strategy.long
 
         if self.db_collection_name == "paper_trading":
             # Dynamic switch to real bot URLs

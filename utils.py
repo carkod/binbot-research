@@ -84,10 +84,10 @@ def define_strategy(self):
     from the market domination function
     """
     trend = None
-    if self.market_domination_reversal:
+    if self.market_domination_reversal is True:
         trend = "uptrend"
     
-    if not self.market_domination_reversal:
+    if self.market_domination_reversal is False:
         trend = "downtrend"
 
     if not self.market_domination and self.market_domination_reversal is None:
