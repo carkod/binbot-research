@@ -22,7 +22,7 @@ def fast_and_slow_macd(
     if macd[str(len(macd) - 1)] > macd_signal[str(len(macd_signal) - 1)] and ma_7[len(ma_7) - 1] > ma_25[len(ma_25) - 1]:
 
         trend = define_strategy(self)
-        if trend is None:
+        if trend is None and trend == "uptrend":
             return
 
         msg = (f"""
