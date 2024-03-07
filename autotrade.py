@@ -314,7 +314,7 @@ class Autotrade(BinbotApi):
         if "trend" in kwargs:
             if kwargs["trend"] == "downtrend":
                 self.default_bot["strategy"] = Strategy.margin_short
-                self.default_bot["close_condition"] = CloseConditions.market_reversal
+                # self.default_bot["close_condition"] = CloseConditions.market_reversal
             else:
                 self.default_bot["strategy"] = Strategy.long
 

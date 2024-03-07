@@ -251,16 +251,3 @@ class BinbotApi(BinanceApi):
         res = get(url=self.bb_market_domination, params={"size": 7})
         data = handle_binance_errors(res)
         return data
-
-class CBSApi:
-    cbs_root_url = "https://api.cryptobasescanner.com/"
-    cbs_bases = f"{cbs_root_url}/v1/bases/"
-
-    def get_cbs_bases(self, algorithm = "day_trade"):
-        params = {
-            "api_key": os.environ["CBS_KEY"],
-            "algorithm": algorithm
-        }
-        res = get(url=self.cbs_bases, params=params)
-        data = handle_binance_errors(res)
-        return 

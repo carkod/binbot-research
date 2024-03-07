@@ -50,6 +50,7 @@ class SetupSignals(BinbotApi):
         self.top_coins_gainers = []
 
         self.btc_change_perc = 0
+        self.volatility = 0
 
     def _send_msg(self, msg):
         """
@@ -327,6 +328,16 @@ class ResearchSignals(SetupSignals):
         if "e" in res and res["e"] == "kline":
             self.process_kline_stream(res)
 
+    def log_volatility(self, data):
+        """
+        Volatility using logarithm, this normalizes data
+        so it's easily comparable with other assets
+        """
+        closing_prices = numpy.array(data["trace"][0]["close"]).astype(float)
+        returns = numpy.log(closing_prices[1:] / closing_prices[:-1])
+        volatility = numpy.std(returns)
+        return volatility
+
     def start_stream(self):
         logging.info("Initializing Research signals")
         self.load_data()
@@ -400,6 +411,8 @@ class ResearchSignals(SetupSignals):
             close_price = float(result["k"]["c"])
             open_price = float(result["k"]["o"])
             data = self._get_candlestick(symbol, self.interval, stats=True)
+
+            self.volatility = self.log_volatility(data)
 
             df = pd.DataFrame(
                 {
