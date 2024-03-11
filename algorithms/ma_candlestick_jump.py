@@ -1,5 +1,5 @@
 import os
-from utils import define_strategy
+from utils import define_strategy, round_numbers
 
 def ma_candlestick_jump(
     self,
@@ -52,6 +52,7 @@ def ma_candlestick_jump(
         msg = (f"""
 - [{os.getenv('ENV')}] Candlestick <strong>#jump algorithm</strong> #{symbol}
 - Current price: {close_price}
+- %threshold based on volatility: {round_numbers(self.volatility * 100, 6)}%
 - SD {sd}
 - Percentage volatility: {(sd) / float(close_price)}
 - Percentage volatility x2: {sd * 2 / float(close_price)}
