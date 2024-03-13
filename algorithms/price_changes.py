@@ -4,8 +4,6 @@ def price_rise_15(
     self,
     close_price,
     symbol,
-    sd,
-    _send_msg,
     run_autotrade,
     prev_price,
     p_value,
@@ -38,15 +36,14 @@ def price_rise_15(
     msg = (f"""
 - [{os.getenv('ENV')}] {first_line} #{symbol}
 - Current price: {close_price}
-- Percentage volatility: {(sd) / float(close_price)}
-- Percentage volatility x2: {sd * 2 / float(close_price)}
+- Standard deviation: {self.sd}, Log volatility (log SD): {self.log_volatility}
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
 - BTC 24hr change: {self.btc_change_perc}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
-    _send_msg(msg)
+    self._send_msg(msg)
 
-    run_autotrade(self, symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "trend": trend})
+    run_autotrade(self, symbol, "rally_pullback", False, **{"sd": self.sd, "current_price": close_price, "trend": trend})
     return

@@ -11,7 +11,6 @@ def ma_candlestick_drop(
     ma_100,
     ma_25,
     symbol,
-    sd,
     _send_msg,
     run_autotrade,
     lowest_price,
@@ -27,7 +26,7 @@ def ma_candlestick_drop(
     """
     if (
         float(close_price) < float(open_price)
-        and sd > 0.09
+        and self.sd > 0.09
         and close_price < ma_7[len(ma_7) - 1]
         and open_price < ma_7[len(ma_7) - 1]
         and close_price < ma_25[len(ma_25) - 1]
@@ -38,7 +37,6 @@ def ma_candlestick_drop(
         and close_price < ma_100[len(ma_100) - 1]
         and open_price < ma_100[len(ma_100) - 1]
         # remove high standard deviation
-        and float(sd) / float(close_price) < 0.07
         # big candles. too many signals with little profitability
         and (abs(float(close_price) - float(open_price)) / float(close_price)) > 0.02
     ):
@@ -50,9 +48,7 @@ def ma_candlestick_drop(
         msg = (f"""
 - [{os.getenv('ENV')}] Candlestick <strong>#drop algorithm</strong> #{symbol}
 - Current price: {close_price}
-- SD {sd}
-- Percentage volatility: {(sd) / float(close_price)}
-- Percentage volatility x2: {sd * 2 / float(close_price)}
+- Standard deviation: {self.sd}, Log volatility (log SD): {self.log_volatility}
 - Slope: {slope}
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}

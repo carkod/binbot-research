@@ -330,13 +330,17 @@ class ResearchSignals(SetupSignals):
 
     def log_volatility(self, data):
         """
-        Volatility using logarithm, this normalizes data
+        Volatility (standard deviation of returns) using logarithm, this normalizes data
         so it's easily comparable with other assets
+
+        Returns:
+        - Volatility in percentage
         """
         closing_prices = numpy.array(data["trace"][0]["close"]).astype(float)
         returns = numpy.log(closing_prices[1:] / closing_prices[:-1])
         volatility = numpy.std(returns)
-        return volatility
+        perc_volatility = round_numbers(volatility * 100, 6)
+        return perc_volatility
 
     def start_stream(self):
         logging.info("Initializing Research signals")
@@ -443,7 +447,7 @@ class ResearchSignals(SetupSignals):
             # Average amplitude
             msg = None
             list_prices = numpy.array(data["trace"][0]["close"])
-            sd = round_numbers(numpy.std(list_prices.astype(numpy.single)), 4)
+            self.sd = round_numbers(numpy.std(list_prices.astype(numpy.single)), 4)
 
             # historical lowest for short_buy_price
             lowest_price = numpy.min(
@@ -463,7 +467,6 @@ class ResearchSignals(SetupSignals):
                     symbol,
                     rsi,
                     ma_25,
-                    self._send_msg,
                     process_autotrade_restrictions,
                 )
 
@@ -471,8 +474,6 @@ class ResearchSignals(SetupSignals):
                     self,
                     close_price,
                     symbol,
-                    sd,
-                    self._send_msg,
                     process_autotrade_restrictions,
                     data["trace"][0]["close"][-2],
                     p_value=pvalue,
@@ -484,8 +485,6 @@ class ResearchSignals(SetupSignals):
                     self,
                     close_price,
                     symbol,
-                    sd,
-                    self._send_msg,
                     process_autotrade_restrictions,
                     lowest_price,
                     pvalue,
@@ -517,7 +516,6 @@ class ResearchSignals(SetupSignals):
                 ma_100,
                 ma_25,
                 symbol,
-                sd,
                 self._send_msg,
                 process_autotrade_restrictions,
                 lowest_price,
@@ -534,7 +532,6 @@ class ResearchSignals(SetupSignals):
                 ma_100,
                 ma_25,
                 symbol,
-                sd,
                 self._send_msg,
                 process_autotrade_restrictions,
                 lowest_price,
@@ -551,7 +548,6 @@ class ResearchSignals(SetupSignals):
                 ma_100,
                 ma_25,
                 symbol,
-                sd,
                 self._send_msg,
                 process_autotrade_restrictions,
                 lowest_price,

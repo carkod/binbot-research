@@ -9,7 +9,6 @@ def ma_candlestick_jump(
     ma_100,
     ma_25,
     symbol,
-    sd,
     _send_msg,
     run_autotrade,
     lowest_price,

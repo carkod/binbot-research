@@ -10,7 +10,6 @@ def top_gainers_drop(
     ma_100,
     ma_25,
     symbol,
-    sd,
     _send_msg,
     run_autotrade,
     lowest_price,
@@ -36,9 +35,7 @@ def top_gainers_drop(
         msg = (f"""
 - [{os.getenv('ENV')}] Top gainers's drop <strong>#top_gainers_drop algorithm</strong> #{symbol}
 - Current price: {close_price}
-- SD {sd}
-- Percentage volatility: {(sd) / float(close_price)}
-- Percentage volatility x2: {sd * 2 / float(close_price)}
+- Standard deviation: {self.sd}, Log volatility (log SD): {self.log_volatility}
 - Slope: {slope}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
 - https://www.binance.com/en/trade/{symbol}

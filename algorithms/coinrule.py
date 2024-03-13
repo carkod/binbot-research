@@ -28,7 +28,7 @@ def fast_and_slow_macd(
         msg = (f"""
         - [{os.getenv('ENV')}] <strong>{algo} #algorithm</strong> #{symbol}
         - Current price: {close_price}
-        - %threshold based on volatility: {round_numbers(self.volatility * 100, 6)}%
+        - Standard deviation: {self.sd}, Log volatility (log SD): {self.log_volatility}%
         - BTC 24hr change: {self.btc_change_perc}
         - Strategy: {trend}
         - Reversal? {"No reversal" if not self.market_domination_reversal else "Positive" if self.market_domination_reversal else "Negative"}
@@ -48,7 +48,6 @@ def buy_low_sell_high(
     symbol,
     rsi,
     ma_25,
-    _send_msg,
     run_autotrade,
 ):
     """
@@ -66,14 +65,14 @@ def buy_low_sell_high(
         msg = (f"""
 - [{os.getenv('ENV')}] <strong>{algo} #algorithm</strong> #{symbol}
 - Current price: {close_price}
-- %threshold based on volatility: {round_numbers(self.volatility * 100, 6)}%
+- Standard deviation: {self.sd}, Log volatility (log SD): {self.log_volatility}%
 - BTC 24hr change: {self.btc_change_perc}
 - Strategy: {trend}
 - Reversal? {"No reversal" if not self.market_domination_reversal else "Positive" if self.market_domination_reversal else "Negative"}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
-        _send_msg(msg)
+        self._send_msg(msg)
         run_autotrade(self, symbol, algo, False, **{"current_price": close_price, "trend": trend})
 
     pass
