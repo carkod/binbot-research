@@ -4,10 +4,8 @@ import re
 import requests
 import logging
 import numpy
-import aiohttp
 
 from signals import SetupSignals
-from autotrade import process_autotrade_restrictions
 from utils import round_numbers
 from time import time
 from scipy.stats import linregress
@@ -27,7 +25,7 @@ class QFL_signals(SetupSignals):
     def custom_telegram_msg(self, msg, symbol):
         message = f"- [{os.getenv('ENV')}] <strong>#QFL Hodloo</strong> signal algorithm #{symbol} {msg} \n- <a href='https://www.binance.com/en/trade/{symbol}'>Binance</a>  \n- <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>"
 
-        self._send_msg(message)
+        self.send_telegram(message)
         return
 
     def check_asset(self, asset):
@@ -185,12 +183,12 @@ class QFL_signals(SetupSignals):
             await asyncio.sleep(1)
         return
 
-    async def start_stream(self):
-        print("Initializing QFL signals")
-        session = aiohttp.ClientSession()
-        self.load_data()
-        async with session.ws_connect(self.hodloo_uri) as ws:
-            async for msg in ws:
-                if msg:
-                    await self.on_message(msg)
-                pass
+    # async def start_stream(self):
+    #     print("Initializing QFL signals")
+    #     session = aiohttp.ClientSession()
+    #     self.load_data()
+    #     async with session.ws_connect(self.hodloo_uri) as ws:
+    #         async for msg in ws:
+    #             if msg:
+    #                 await self.on_message(msg)
+    #             pass

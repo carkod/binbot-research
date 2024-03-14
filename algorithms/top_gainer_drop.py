@@ -10,8 +10,6 @@ def top_gainers_drop(
     ma_100,
     ma_25,
     symbol,
-    _send_msg,
-    run_autotrade,
     lowest_price,
     slope,
     btc_correlation
@@ -35,15 +33,13 @@ def top_gainers_drop(
         msg = (f"""
 - [{os.getenv('ENV')}] Top gainers's drop <strong>#top_gainers_drop algorithm</strong> #{symbol}
 - Current price: {close_price}
-- Standard deviation: {self.sd}, Log volatility (log SD): {self.log_volatility}
+- Standard deviation: {self.sd}, Log volatility (log SD): {self.volatility}
 - Slope: {slope}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
 - https://www.binance.com/en/trade/{symbol}
 - <a href='http://terminal.binbot.in/admin/bots/new/{symbol}'>Dashboard trade</a>
 """)
-        _send_msg(msg)
-        print(msg)
-
-        run_autotrade(self, symbol, "top_gainers_drop", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
+        self.send_telegram(msg)
+        self.process_autotrade_restrictions(symbol, "top_gainers_drop", False, **{"sd": self.sd, "current_price": close_price, "lowest_price": lowest_price, "trend": "downtrend"})
 
     return

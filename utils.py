@@ -9,11 +9,14 @@ from requests import HTTPError, Response
 class BinanceErrors(Exception):
     pass
 
+
 class BinbotError(Exception):
     pass
 
+
 class InvalidSymbol(BinanceErrors):
     pass
+
 
 def round_numbers(value, decimals=6):
     decimal_points = 10 ** int(decimals)
@@ -22,6 +25,7 @@ def round_numbers(value, decimals=6):
     if decimals == 0:
         result = int(result)
     return result
+
 
 def supress_notation(num: float, precision: int = 0):
     """
@@ -50,7 +54,7 @@ def handle_binance_errors(response: Response):
         print(response.status_code, response.url)
         if response.status_code == 418:
             sleep(120)
-    
+
     # Calculate request weights and pause half of the way (1200/2=600)
     if (
         "x-mbx-used-weight-1m" in response.headers
@@ -68,7 +72,7 @@ def handle_binance_errors(response: Response):
 
             if content["code"] == -1121:
                 raise InvalidSymbol("Binance error, invalid symbol")
-        
+
         if "error" in content and content["error"] == 1:
             logging.error(content["message"])
 
@@ -76,6 +80,7 @@ def handle_binance_errors(response: Response):
             return content
     except HTTPError:
         raise HTTPError(content["msg"])
+
 
 def define_strategy(self):
     """
@@ -86,7 +91,7 @@ def define_strategy(self):
     trend = None
     if self.market_domination_reversal is True:
         trend = "uptrend"
-    
+
     if self.market_domination_reversal is False:
         trend = "downtrend"
 
@@ -94,3 +99,22 @@ def define_strategy(self):
         trend = None
 
     return trend
+
+
+def bollinguer_spreads(ma_100, ma_25, ma_7):
+    """
+    Calculates spread based on bollinger bands,
+    for later use in take profit and stop loss
+
+    Returns:
+    - top_band: diff between ma_25 and ma_100
+    - spread: spread in absolute value
+    """
+
+    band_1 = ((ma_100[500] - ma_25[500]) / ma_100[500]) * 100
+    band_2 = ((ma_25[500] - ma_7[500]) / ma_25[500]) * 100
+
+    return {
+        "band_1": abs(float(supress_notation(band_1, 4))),
+        "band_2": abs(float(supress_notation(band_2, 4))),
+    }
