@@ -18,17 +18,17 @@ def fast_and_slow_macd(
     stderr,
 ):
     """
-    Coinrule top performance rule
+    Modified Coinrule top performance rule
     https://web.coinrule.com/share-rule/Fast-EMA-above-Slow-EMA-with-MACD-6f8653
-
     """
     algo = "coinrule_fast_and_slow_macd"
     spread = None
 
-    if macd[str(len(macd) - 1)] > macd_signal[str(len(macd_signal) - 1)] and ma_7[len(ma_7) - 1] > ma_25[len(ma_25) - 1]:
+    if macd[str(len(macd) - 1)] > macd_signal[str(len(macd_signal) - 1)] and close_price < ma_100[len(ma_100) - 1] and close_price < ma_100[len(ma_100) - 2] and close_price < ma_100[len(ma_100) - 3]:
 
         trend = define_strategy(self)
-        if trend is None and trend == "uptrend":
+        # Check for confirmation of trend
+        if trend is None and trend == "downtrend":
             return
         
         # Second stage filtering when volatility is high

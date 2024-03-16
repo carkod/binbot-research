@@ -69,10 +69,14 @@ class Autotrade(BinbotApi):
             band_1 = kwargs["spread"]["band_1"]
             band_2 = kwargs["spread"]["band_2"]
 
-            self.default_bot["take_profit"] = band_1 * 100
-            self.default_bot["stop_loss"] = (band_1 + band_2)
+            stop_loss = max(band_1, band_2)
+            trailling_value = min(band_1, band_2)
+
+            self.default_bot["stop_loss"] = stop_loss
             self.default_bot["trailling"] = True
-            self.default_bot["trailling_deviation"] = band_1 * 100
+            self.default_bot["trailling_deviation"] = trailling_value
+        else:
+            pass
 
     def handle_error(self, msg):
         """

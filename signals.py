@@ -13,6 +13,7 @@ from algorithms.rally import rally_or_pullback
 from algorithms.price_changes import price_rise_15
 from algorithms.top_gainer_drop import top_gainers_drop
 from algorithms.coinrule import fast_and_slow_macd, buy_low_sell_high
+from algorithms.ml_linear_regression import ml_linear_regression
 from apis import BinbotApi
 from streaming.socket_client import SpotWebsocketStreamClient
 from scipy import stats
@@ -132,7 +133,7 @@ class SetupSignals(BinbotApi):
         if "error" in (settings_data, blacklist_res) and (
             settings_data["error"] == 1 or blacklist_res["error"] == 1
         ):
-            print(settings_data)
+            logging.error(settings_data)
 
         # Remove restart flag, as we are already restarting
         if (
@@ -608,6 +609,13 @@ class ResearchSignals(SetupSignals):
                 slope=slope,
                 p_value=pvalue,
                 btc_correlation=btc_correlation,
+            )
+
+            ml_linear_regression(
+                data,
+                ma_7,
+                ma_100,
+                ma_25
             )
 
             top_gainers_drop(
