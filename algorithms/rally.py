@@ -7,7 +7,6 @@ def rally_or_pullback(
     self,
     close_price,
     symbol,
-    run_autotrade,
     lowest_price,
     p_value,
     open_price,
@@ -54,7 +53,7 @@ def rally_or_pullback(
     msg = (f"""
 - [{os.getenv('ENV')}] <strong>{algo_type} #algorithm</strong> #{symbol}
 - Current price: {close_price}
-- Standard deviation: {self.sd}, Log volatility (log SD): {self.log_volatility}
+- Standard deviation: {self.sd}, Log volatility (log SD): {self.volatility}
 - P-value: {p_value}
 - Pearson correlation with BTC: {btc_correlation["close_price"]}
 - BTC 24hr change: {self.btc_change_perc}
@@ -76,7 +75,7 @@ def rally_or_pullback(
             and close_price < ma_100[len(ma_100) - 3]
         ):
 
-            self._send_msg(msg)
-            # run_autotrade(self, symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
+            self.send_telegram(msg)
+            # self.process_autotrade_restrictions(symbol, "rally_pullback", False, **{"sd": sd, "current_price": close_price, "lowest_price": lowest_price, "trend": trend})
 
     return

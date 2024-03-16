@@ -4,7 +4,7 @@ import logging
 import requests
 
 from datetime import datetime
-from enums import CloseConditions, Strategy
+from enums import Strategy
 from apis import BinbotApi
 from utils import InvalidSymbol, handle_binance_errors, round_numbers, supress_notation
 
@@ -63,7 +63,17 @@ class Autotrade(BinbotApi):
         blacklist_res = self.get_blacklist()
         if not "error" in blacklist_res:
             self.blacklist = blacklist_res["data"]
-    
+
+    def _set_bollinguer_spreads(self, kwargs):
+        if "spread" in kwargs and kwargs["spread"]:
+            band_1 = kwargs["spread"]["band_1"]
+            band_2 = kwargs["spread"]["band_2"]
+
+            self.default_bot["take_profit"] = band_1 * 100
+            self.default_bot["stop_loss"] = (band_1 + band_2)
+            self.default_bot["trailling"] = True
+            self.default_bot["trailling_deviation"] = band_1 * 100
+
     def handle_error(self, msg):
         """
         Submit errors to event logs of the bot
@@ -107,23 +117,31 @@ class Autotrade(BinbotApi):
         this overrides the settings in research_controller autotrade settings
         """
 
-        if "sd" not in kwargs:
-            margin_short_volatility = 1.8
-        else:
-            margin_short_volatility = round_numbers((float(kwargs["sd"]) / float(kwargs["current_price"])), 2) * 100
-
-        # Most cryptos don't have enough with 15 USDT
-        self.default_bot["strategy"] = "margin_short"
-        # self.default_bot["base_order_size"] = float(self.default_bot["base_order_size"]) * (1 + float(self.default_bot["stop_loss"]))
-        self.default_bot["trailling"] = True
         # Binances forces isolated pair to go through 24hr deactivation after traded
         self.default_bot["cooldown"] = 1440
         self.default_bot["margin_short_reversal"] = True
+
+        self._set_bollinguer_spreads(**kwargs)
 
         # Override for top_gainers_drop
         if self.algorithm_name == "top_gainers_drop":
             self.default_bot["stop_loss"] = 5
             self.default_bot["trailling_deviation"] = 3.2
+
+        
+    def set_bot_values(self, **kwargs):
+        """
+        Set values for default_bot
+        """
+        self.default_bot["base_order_size"] = self.settings["base_order_size"]
+        self.default_bot[
+            "balance_to_use"
+        ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
+        self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
+        self.default_bot["margin_short_reversal"] = True
+
+        self._set_bollinguer_spreads(kwargs)
+            
 
     def handle_price_drops(
         self,
@@ -215,26 +233,6 @@ class Autotrade(BinbotApi):
                 )
         return
     
-    def set_bot_values(self, kwargs):
-        """
-        Set values for default_bot
-        """
-        self.default_bot["base_order_size"] = self.settings["base_order_size"]
-        self.default_bot[
-            "balance_to_use"
-        ] = "USDT"  # For now we are always using USDT. Safest and most coins/tokens
-        self.default_bot["cooldown"] = 360 # Avoid cannibalization of profits
-        self.default_bot["margin_short_reversal"] = True
-
-        if "sd" in kwargs and "current_price" in kwargs and self.default_bot["dynamic_trailling"]:
-            sd = kwargs["sd"]
-            self.default_bot["sd"] = sd
-            volatility = (sd / 2) / float(kwargs["current_price"])
-            if volatility < 0.018:
-                volatility = 0.018
-            elif volatility > 0.06:
-                volatility = 0.06
-    
     def set_paper_trading_values(self, balances, qty):
 
         self.default_bot["base_order_size"] = "15"  # min USDT order = 15
@@ -297,11 +295,11 @@ class Autotrade(BinbotApi):
         2. Create bot with given parameters from research_controller
         3. Activate bot
         """
-        print(f"{self.db_collection_name} Autotrade running with {self.pair}...")
+        logging.info(f"{self.db_collection_name} Autotrade running with {self.pair}...")
         if self.blacklist:
             for item in self.blacklist:
                 if item["pair"] == self.pair:
-                    print(f"Pair {self.pair} is blacklisted")
+                    logging.info(f"Pair {self.pair} is blacklisted")
                     return
             
         # Check balance, if no balance set autotrade = 0
@@ -324,7 +322,7 @@ class Autotrade(BinbotApi):
             activate_url = self.bb_activate_test_bot_url
 
             if self.default_bot["strategy"] == "margin_short":
-                self.set_margin_short_values(kwargs)
+                self.set_margin_short_values(**kwargs)
                 pass
             else:
                 self.set_paper_trading_values(balances, qty)
@@ -349,10 +347,10 @@ class Autotrade(BinbotApi):
                 if balances < transfer_qty:
                     logging.error(f"Not enough funds to autotrade margin_short bot. Unable to cover potential losses. balances: {balances}. transfer qty: {transfer_qty}")
                     return
-                self.set_margin_short_values(kwargs)
+                self.set_margin_short_values(**kwargs)
                 pass
             else:
-                self.set_bot_values(kwargs)
+                self.set_bot_values(**kwargs)
                 pass
 
         # Create bot
@@ -388,54 +386,3 @@ class Autotrade(BinbotApi):
         else:
             message = f"Succesful {self.db_collection_name} autotrade, opened with {self.pair}!"
             self.submit_bot_event_logs(botId, message)
-
-
-def process_autotrade_restrictions(
-    self, symbol, algorithm, test_only=False, *args, **kwargs
-):
-    """
-    Refactored autotrade conditions.
-    Previously part of process_kline_stream
-    1. Checks if we have balance to trade
-    2. Check if we need to update websockets
-    3. Check if autotrade is enabled
-    4. Check if test autotrades
-    5. Check active strategy
-    """
-    # Wrap in try and except to avoid bugs stopping real bot trades
-    try:
-        if (
-            symbol not in self.active_test_bots
-            and int(self.test_autotrade_settings["autotrade"]) == 1
-        ):
-            if self.reached_max_active_autobots("paper_trading"):
-                print(
-                    "Reached maximum number of active bots set in controller settings"
-                )
-            else:
-                # Test autotrade runs independently of autotrade = 1
-                test_autotrade = Autotrade(
-                    symbol, self.test_autotrade_settings, algorithm, "paper_trading"
-                )
-                test_autotrade.activate_autotrade(**kwargs)
-    except Exception as error:
-        print(error)
-        pass
-
-    # Check balance to avoid failed autotrades
-    balance_check = self.balance_estimate()
-    if balance_check < float(self.settings['base_order_size']):
-        print(f"Not enough funds to autotrade [bots].")
-        return
-
-
-    if (int(self.settings["autotrade"]) == 1
-        and not test_only):
-        if self.reached_max_active_autobots("bots"):
-            print("Reached maximum number of active bots set in controller settings")
-        else:
-
-            autotrade = Autotrade(symbol, self.settings, algorithm, "bots")
-            autotrade.activate_autotrade(**kwargs)
-
-    return

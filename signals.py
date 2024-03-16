@@ -8,19 +8,18 @@ from time import sleep, time
 import numpy
 import pandas as pd
 import requests
-from algorithms.ma_candlestick_drop import ma_candlestick_drop
-from algorithms.ma_candlestick_jump import ma_candlestick_jump
+from algorithms.ma_candlestick import ma_candlestick_jump, ma_candlestick_drop
 from algorithms.rally import rally_or_pullback
 from algorithms.price_changes import price_rise_15
 from algorithms.top_gainer_drop import top_gainers_drop
 from algorithms.coinrule import fast_and_slow_macd, buy_low_sell_high
 from apis import BinbotApi
-from autotrade import process_autotrade_restrictions
 from streaming.socket_client import SpotWebsocketStreamClient
 from scipy import stats
 from telegram_bot import TelegramBot
 from utils import handle_binance_errors, round_numbers
 from typing import Literal
+from autotrade import Autotrade
 
 
 class SetupSignals(BinbotApi):
@@ -29,7 +28,7 @@ class SetupSignals(BinbotApi):
     """
 
     def __init__(self):
-        self.interval = "15m"
+        self.interval = "1h"
         self.markets_streams = None
         self.skipped_fiat_currencies = [
             "DOWN",
@@ -52,7 +51,7 @@ class SetupSignals(BinbotApi):
         self.btc_change_perc = 0
         self.volatility = 0
 
-    def _send_msg(self, msg):
+    def send_telegram(self, msg):
         """
         Send message with telegram bot
         To avoid Conflict - duplicate Bot error
@@ -185,6 +184,65 @@ class SetupSignals(BinbotApi):
         handle_binance_errors(res)
         return
 
+    def process_autotrade_restrictions(
+        self, symbol, algorithm, test_only=False, *args, **kwargs
+    ):
+        """
+        Refactored autotrade conditions.
+        Previously part of process_kline_stream
+
+        1. Checks if we have balance to trade
+        2. Check if we need to update websockets
+        3. Check if autotrade is enabled
+        4. Check if test autotrades
+        5. Check active strategy
+        """
+
+        """
+        Test autotrade starts
+
+        Wrap in try and except to avoid bugs stopping real bot trades
+        """
+        try:
+            if (
+                symbol not in self.active_test_bots
+                and int(self.test_autotrade_settings["autotrade"]) == 1
+            ):
+                if self.reached_max_active_autobots("paper_trading"):
+                    logging.info(
+                        "Reached maximum number of active bots set in controller settings"
+                    )
+                else:
+                    # Test autotrade runs independently of autotrade = 1
+                    test_autotrade = Autotrade(
+                        symbol, self.test_autotrade_settings, algorithm, "paper_trading"
+                    )
+                    test_autotrade.activate_autotrade(**kwargs)
+        except Exception as error:
+            print(error)
+            pass
+
+        # Check balance to avoid failed autotrades
+        balance_check = self.balance_estimate()
+        if balance_check < float(self.settings['base_order_size']):
+            print(f"Not enough funds to autotrade [bots].")
+            return
+
+        """
+        Real autotrade starts
+        """
+        if (int(self.settings["autotrade"]) == 1
+            and not test_only):
+            if self.reached_max_active_autobots("bots"):
+                logging.info("Reached maximum number of active bots set in controller settings")
+            else:
+
+                autotrade = Autotrade(symbol, self.settings, algorithm, "bots")
+                autotrade.activate_autotrade(**kwargs)
+
+        return
+
+
     def reached_max_active_autobots(self, db_collection_name: str) -> bool:
         """
         Check max `max_active_autotrade_bots` in controller settings
@@ -280,7 +338,7 @@ class SetupSignals(BinbotApi):
 
 
 class ResearchSignals(SetupSignals):
-    def __init__(self):
+    def __init__(self) -> None:
         info("Started research signals")
         self.last_processed_kline = {}
         self.client = SpotWebsocketStreamClient(
@@ -342,6 +400,31 @@ class ResearchSignals(SetupSignals):
         perc_volatility = round_numbers(volatility * 100, 6)
         return perc_volatility
 
+    def calculate_slope(candlesticks):
+        """
+        Slope = 1: positive, the curve is going up
+        Slope = -1: negative, the curve is going down
+        Slope = 0: vertical movement
+        """
+        # Ensure the candlesticks list has at least two elements
+        if len(candlesticks) < 2:
+            return None
+        
+        # Calculate the slope
+        previous_close = candlesticks["trace"][0]["close"]
+        for candle in candlesticks["trace"][1:]:
+            current_close = candle["close"]
+            if current_close > previous_close:
+                slope = 1
+            elif current_close < previous_close:
+                slope = -1
+            else:
+                slope = 0
+            
+            previous_close = current_close
+        
+        return slope
+
     def start_stream(self):
         logging.info("Initializing Research signals")
         self.load_data()
@@ -379,21 +462,6 @@ class ResearchSignals(SetupSignals):
         # update DB
         self.update_subscribed_list(subscription_list)
 
-        # It's not possible to have websockets with more 950 pairs
-        # So set default to max 950
-        # total_threads = math.floor(len(market) / self.max_request) + (
-        #     1 if len(market) % self.max_request > 0 else 0
-        # )
-        # stream = params[:950]
-        # params.append("BTCUSDT")
-
-        # if total_threads > 1 or not self.max_request:
-        #     for index in range(total_threads - 1):
-        #         stream = params[(self.max_request + 1) :]
-        #         if index == 0:
-        #             stream = params[: self.max_request]
-        #         self.client.klines(markets=stream, interval=self.interval)
-        # else:
         self.client.klines(markets=params, interval=self.interval)
 
     def process_kline_stream(self, result):
@@ -467,14 +535,14 @@ class ResearchSignals(SetupSignals):
                     symbol,
                     rsi,
                     ma_25,
-                    process_autotrade_restrictions,
+                    ma_7,
+                    ma_100,
                 )
 
                 price_rise_15(
                     self,
                     close_price,
                     symbol,
-                    process_autotrade_restrictions,
                     data["trace"][0]["close"][-2],
                     p_value=pvalue,
                     r_value=rvalue,
@@ -485,7 +553,6 @@ class ResearchSignals(SetupSignals):
                     self,
                     close_price,
                     symbol,
-                    process_autotrade_restrictions,
                     lowest_price,
                     pvalue,
                     open_price,
@@ -504,8 +571,12 @@ class ResearchSignals(SetupSignals):
                 macd_signal,
                 ma_7,
                 ma_25,
-                self._send_msg,
-                process_autotrade_restrictions,
+                ma_100,
+                slope,
+                intercept,
+                rvalue,
+                pvalue,
+                stderr,
             )
 
             ma_candlestick_jump(
@@ -516,11 +587,12 @@ class ResearchSignals(SetupSignals):
                 ma_100,
                 ma_25,
                 symbol,
-                self._send_msg,
-                process_autotrade_restrictions,
                 lowest_price,
-                slope=slope,
-                p_value=pvalue,
+                slope,
+                intercept,
+                rvalue,
+                pvalue,
+                stderr,
                 btc_correlation=btc_correlation,
             )
 
@@ -532,8 +604,6 @@ class ResearchSignals(SetupSignals):
                 ma_100,
                 ma_25,
                 symbol,
-                self._send_msg,
-                process_autotrade_restrictions,
                 lowest_price,
                 slope=slope,
                 p_value=pvalue,
@@ -548,8 +618,6 @@ class ResearchSignals(SetupSignals):
                 ma_100,
                 ma_25,
                 symbol,
-                self._send_msg,
-                process_autotrade_restrictions,
                 lowest_price,
                 slope,
                 btc_correlation,
